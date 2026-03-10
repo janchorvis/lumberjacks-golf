@@ -51,7 +51,8 @@ export default function AuthenticatedLayout({
 
   // Derive a page title from the current path
   const segment = currentPath.split('/').filter(Boolean)[0] || 'Dashboard';
-  const pageTitle = segment.charAt(0).toUpperCase() + segment.slice(1);
+  const titleMap: Record<string, string> = { picks: 'My Team' };
+  const pageTitle = titleMap[segment] || segment.charAt(0).toUpperCase() + segment.slice(1);
 
   return (
     <div className="flex min-h-screen">
