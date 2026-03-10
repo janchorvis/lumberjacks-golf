@@ -2,13 +2,14 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-const RANKINGS: { name: string; ranking: number }[] = [
+// Canonical name -> ranking, plus DB name variants
+const RANKINGS: { name: string; ranking: number; aliases?: string[] }[] = [
   { name: 'Scottie Scheffler', ranking: 1 },
   { name: 'Xander Schauffele', ranking: 2 },
   { name: 'Viktor Hovland', ranking: 3 },
   { name: 'Collin Morikawa', ranking: 4 },
   { name: 'Rory McIlroy', ranking: 5 },
-  { name: 'Ludvig Åberg', ranking: 6 },
+  { name: 'Ludvig Åberg', ranking: 6, aliases: ['Ludvig Aberg'] },
   { name: 'Jon Rahm', ranking: 7 },
   { name: 'Patrick Cantlay', ranking: 8 },
   { name: 'Wyndham Clark', ranking: 9 },
@@ -43,28 +44,44 @@ const RANKINGS: { name: string; ranking: number }[] = [
 async function main() {
   console.log('Seeding rankings for golfers...');
 
-  const rankingMap = new Map<string, number>();
-  for (const entry of RANKINGS) {
-    rankingMap.set(entry.name.toLowerCase(), entry.ranking);
-  }
-
   const golfers = await prisma.golfer.findMany();
   console.log(`Found ${golfers.length} golfers in database`);
 
   let updated = 0;
-  for (const golfer of golfers) {
-    const ranking = rankingMap.get(golfer.name.toLowerCase());
-    if (ranking !== undefined) {
+  let created = 0;
+
+  for (const entry of RANKINGS) {
+    // Build set of all names to search for
+    const namesToSearch = [entry.name, ...(entry.aliases || [])];
+
+    // Try to find existing golfer by any name variant
+    let found = golfers.find((g) =>
+      namesToSearch.some(
+        (n) => n.toLowerCase() === g.name.toLowerCase()
+      )
+    );
+
+    if (found) {
       await prisma.golfer.update({
-        where: { id: golfer.id },
-        data: { ranking },
+        where: { id: found.id },
+        data: { ranking: entry.ranking },
       });
-      console.log(`  ${golfer.name} -> #${ranking}`);
+      console.log(`  ${found.name} -> #${entry.ranking}`);
       updated++;
+    } else {
+      // Golfer not in DB — create them
+      const newGolfer = await prisma.golfer.create({
+        data: {
+          name: entry.name,
+          ranking: entry.ranking,
+        },
+      });
+      console.log(`  [CREATED] ${newGolfer.name} -> #${entry.ranking}`);
+      created++;
     }
   }
 
-  console.log(`\nUpdated rankings for ${updated} of ${RANKINGS.length} golfers`);
+  console.log(`\nUpdated: ${updated}, Created: ${created}`);
   console.log('Done!');
 }
 

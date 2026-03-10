@@ -65,17 +65,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get all golfers in the tournament field
+    // Get golfers from tournament field if available, otherwise fall back to all golfers
     const fieldEntries = await prisma.tournamentField.findMany({
       where: { tournamentId },
       include: { golfer: true },
     });
 
-    if (fieldEntries.length === 0) {
-      return NextResponse.json(
-        { error: 'No golfers in tournament field' },
-        { status: 404 }
-      );
+    let golferPool: { golferId: string; golferName: string }[];
+
+    if (fieldEntries.length > 0) {
+      golferPool = fieldEntries.map((e) => ({
+        golferId: e.golfer.id,
+        golferName: e.golfer.name,
+      }));
+    } else {
+      // Fall back to all golfers in the database
+      const allGolfers = await prisma.golfer.findMany({
+        select: { id: true, name: true },
+      });
+      golferPool = allGolfers.map((g) => ({
+        golferId: g.id,
+        golferName: g.name,
+      }));
     }
 
     const results: { golferName: string; matched: string | null; status: string }[] = [];
@@ -85,11 +96,11 @@ export async function POST(request: NextRequest) {
       let bestMatch: { golferId: string; golferName: string } | null = null;
       let bestScore = 0;
 
-      for (const entry of fieldEntries) {
-        const matchScore = fuzzyMatch(score.golferName, entry.golfer.name);
+      for (const entry of golferPool) {
+        const matchScore = fuzzyMatch(score.golferName, entry.golferName);
         if (matchScore > bestScore) {
           bestScore = matchScore;
-          bestMatch = { golferId: entry.golfer.id, golferName: entry.golfer.name };
+          bestMatch = entry;
         }
       }
 
@@ -103,6 +114,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Calculate scoreToPar from round scores
+      // Assume par 72 per round
       const roundScores = [score.r1, score.r2, score.r3, score.r4].filter(
         (s): s is number => s != null
       );
@@ -146,8 +158,11 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const updated = results.filter((r) => r.status === 'updated').length;
+    const notFound = results.filter((r) => r.status === 'not_found').length;
+
     return NextResponse.json({
-      message: `Processed ${scores.length} scores`,
+      message: `Processed ${scores.length} scores: ${updated} updated, ${notFound} not found`,
       results,
     });
   } catch (error) {
