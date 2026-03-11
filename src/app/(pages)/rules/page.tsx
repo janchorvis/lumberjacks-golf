@@ -172,6 +172,19 @@ export default function RulesPage() {
           </p>
         </div>
       </Card>
+
+      {/* Join League */}
+      <Card goldBorder>
+        <div className="p-6 text-center space-y-2">
+          <p className="text-xs font-semibold text-augusta-gold uppercase tracking-wider">
+            Join the League
+          </p>
+          <p className="text-sm text-gray-600">
+            Go to <a href="/leagues" className="text-augusta-green font-medium hover:underline">Leagues</a> and enter the invite code:
+          </p>
+          <p className="text-2xl font-mono font-bold text-augusta-green tracking-widest">LUMBER2026</p>
+        </div>
+      </Card>
     </div>
   );
 }

@@ -12,7 +12,7 @@ const navLinks = [
   { href: '/draft', label: 'Draft', icon: '🐍' },
   { href: '/picks', label: 'My Team', icon: '✎' },
   { href: '/standings', label: 'Standings', icon: '☰' },
-  { href: '/leagues', label: 'Leagues', icon: '⚑' },
+
   { href: '/rules', label: 'Rules', icon: '📋' },
 ];
 
