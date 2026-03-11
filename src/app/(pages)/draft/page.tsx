@@ -63,6 +63,7 @@ export default function DraftPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [picking, setPicking] = useState(false);
+  const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
   const [pickError, setPickError] = useState<string | null>(null);
 
   // Confirmation modal
@@ -467,24 +468,48 @@ export default function DraftPage() {
         </div>
       )}
 
-      {/* All teams pick counts */}
-      <div className="grid grid-cols-2 gap-2">
+      {/* All teams pick counts - tap to expand */}
+      <div className="space-y-2">
         {draft.players.map((player) => {
           const playerPicks = Object.values(draft.picksByRound)
             .flat()
-            .filter((p) => p.userId === player.userId);
+            .filter((p) => p.userId === player.userId)
+            .sort((a, b) => a.pickNumber - b.pickNumber);
+          const isExpanded = expandedPlayer === player.userId;
           return (
-            <Card
+            <div
               key={player.userId}
-              className={`p-3 text-center ${
+              onClick={() => setExpandedPlayer(isExpanded ? null : player.userId)}
+            >
+            <Card
+              className={`overflow-hidden cursor-pointer ${
                 draft.currentDrafter === player.userId && draft.status === 'active'
                   ? 'ring-2 ring-augusta-gold'
                   : ''
               }`}
             >
-              <p className="text-sm font-semibold text-gray-900 truncate">{player.username}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{playerPicks.length}/7 picks</p>
+              <div className="p-3 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">{player.username}</p>
+                  <p className="text-xs text-gray-500">{playerPicks.length}/7 picks</p>
+                </div>
+                <span className={`text-gray-400 text-xs transition-transform ${isExpanded ? 'rotate-180' : ''}`}>▼</span>
+              </div>
+              {isExpanded && playerPicks.length > 0 && (
+                <div className="border-t border-gray-100 px-3 pb-3 pt-2 space-y-1">
+                  {playerPicks.map((pick, i) => (
+                    <div key={pick.pickNumber} className="flex items-center justify-between py-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-gray-400 w-4">{i + 1}.</span>
+                        <span className="text-sm text-gray-800">{pick.golferName}</span>
+                      </div>
+                      <span className="text-[10px] text-gray-400">Pick #{pick.pickNumber}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Card>
+            </div>
           );
         })}
       </div>
