@@ -265,7 +265,7 @@ export default function LeaguesPage() {
             value={joinCode}
             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
             error={joinError}
-            maxLength={6}
+            maxLength={20}
             className="font-mono tracking-widest text-center text-lg"
             onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
           />
