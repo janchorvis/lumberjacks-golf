@@ -160,7 +160,6 @@ export async function POST(request: NextRequest) {
       // ESPN: round linescore.value = stroke total, linescore.linescores = hole-by-hole
       const rounds: Record<number, number | null> = { 1: null, 2: null, 3: null, 4: null };
       let thru: number | null = null;
-      let activeRound = 0;
 
       for (const ls of comp.linescores ?? []) {
         if (ls.period < 1 || ls.period > 4) continue;
@@ -172,9 +171,8 @@ export async function POST(request: NextRequest) {
           // Completed round
           rounds[ls.period] = strokes;
         } else if (holeCount > 0) {
-          // In-progress round: store partial stroke count
+          // In-progress round
           rounds[ls.period] = strokes;
-          activeRound = ls.period;
           thru = holeCount; // holes completed this round
         } else if (strokes != null) {
           rounds[ls.period] = strokes;
