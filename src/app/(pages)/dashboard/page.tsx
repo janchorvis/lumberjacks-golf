@@ -5,6 +5,9 @@ import Link from 'next/link';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 
+// Module-level cache — survives tab switches (component remounts)
+let _dashboardCache: { user: User; tournament: Tournament | null; standings: Standing[]; draftInfo: DraftInfo | null; myTeam: MyPick[] } | null = null;
+
 interface User {
   id: string;
   username: string;
@@ -48,16 +51,24 @@ function formatScore(score: number | null): string {
 }
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [tournament, setTournament] = useState<Tournament | null>(null);
-  const [standings, setStandings] = useState<Standing[]>([]);
-  const [draftInfo, setDraftInfo] = useState<DraftInfo | null>(null);
-  const [myTeam, setMyTeam] = useState<MyPick[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cached = _dashboardCache;
+  const [user, setUser] = useState<User | null>(cached?.user ?? null);
+  const [tournament, setTournament] = useState<Tournament | null>(cached?.tournament ?? null);
+  const [standings, setStandings] = useState<Standing[]>(cached?.standings ?? []);
+  const [draftInfo, setDraftInfo] = useState<DraftInfo | null>(cached?.draftInfo ?? null);
+  const [myTeam, setMyTeam] = useState<MyPick[]>(cached?.myTeam ?? []);
+  const [loading, setLoading] = useState(!cached);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
+      // Local vars to accumulate before setting state + cache
+      let fetchedUser: User | null = null;
+      let fetchedTournament: Tournament | null = null;
+      let fetchedStandings: Standing[] = [];
+      let fetchedDraftInfo: DraftInfo | null = null;
+      let fetchedMyTeam: MyPick[] = [];
+
       try {
         const [meRes, tournamentRes, leaguesRes] = await Promise.all([
           fetch('/api/auth/me'),
@@ -72,13 +83,11 @@ export default function DashboardPage() {
         }
 
         const meData = await meRes.json();
-        setUser(meData.user);
+        fetchedUser = meData.user;
 
-        let currentTournament: Tournament | null = null;
         if (tournamentRes.ok) {
           const tournamentData = await tournamentRes.json();
-          currentTournament = tournamentData.tournament;
-          setTournament(currentTournament);
+          fetchedTournament = tournamentData.tournament;
         }
 
         if (leaguesRes.ok) {
@@ -90,24 +99,22 @@ export default function DashboardPage() {
             const standingsRes = await fetch(`/api/standings/${leagueId}`);
             if (standingsRes.ok) {
               const standingsData = await standingsRes.json();
-              setStandings(standingsData.standings || []);
+              fetchedStandings = standingsData.standings || [];
             }
 
-            if (currentTournament) {
+            if (fetchedTournament) {
               try {
-                const draftRes = await fetch(`/api/draft/${currentTournament.id}`);
+                const draftRes = await fetch(`/api/draft/${fetchedTournament.id}`);
                 if (draftRes.ok) {
                   const draftData = await draftRes.json();
-                  setDraftInfo(draftData.draft);
+                  fetchedDraftInfo = draftData.draft;
                 }
-              } catch {
-                // no draft
-              }
+              } catch { /* no draft */ }
 
               try {
                 const [picksRes, detailRes] = await Promise.all([
-                  fetch(`/api/picks/${currentTournament.id}?leagueId=${leagueId}`),
-                  fetch(`/api/tournaments/${currentTournament.id}`),
+                  fetch(`/api/picks/${fetchedTournament.id}?leagueId=${leagueId}`),
+                  fetch(`/api/tournaments/${fetchedTournament.id}`),
                 ]);
                 if (picksRes.ok && detailRes.ok) {
                   const picksData = await picksRes.json();
@@ -116,21 +123,35 @@ export default function DashboardPage() {
                   const resultMap = new Map(
                     (detail.results || []).map((r: { golferId: string; scoreToPar: number | null }) => [r.golferId, r.scoreToPar])
                   );
-                  setMyTeam(
-                    picks.map((p: { golferId: string; golferName: string }) => ({
-                      golferName: p.golferName,
-                      scoreToPar: (resultMap.get(p.golferId) as number | null) ?? null,
-                    }))
-                  );
+                  fetchedMyTeam = picks.map((p: { golferId: string; golferName: string }) => ({
+                    golferName: p.golferName,
+                    scoreToPar: (resultMap.get(p.golferId) as number | null) ?? null,
+                  }));
                 }
-              } catch {
-                // no picks
-              }
+              } catch { /* no picks */ }
             }
           }
         }
+
+        // Save to module cache — survives tab switches
+        if (fetchedUser) {
+          _dashboardCache = {
+            user: fetchedUser,
+            tournament: fetchedTournament,
+            standings: fetchedStandings,
+            draftInfo: fetchedDraftInfo,
+            myTeam: fetchedMyTeam,
+          };
+        }
+
+        // Batch state updates
+        if (fetchedUser) setUser(fetchedUser);
+        setTournament(fetchedTournament);
+        setStandings(fetchedStandings);
+        setDraftInfo(fetchedDraftInfo);
+        setMyTeam(fetchedMyTeam);
       } catch {
-        setError('Failed to load dashboard data');
+        if (!_dashboardCache) setError('Failed to load dashboard data');
       } finally {
         setLoading(false);
       }

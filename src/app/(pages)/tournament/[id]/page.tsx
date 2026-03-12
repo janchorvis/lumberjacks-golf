@@ -6,6 +6,8 @@ import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { GolferResult } from '@/types';
 
+
+
 interface MemberPick {
   userId: string;
   username: string;
@@ -46,6 +48,9 @@ interface Team {
   points: number;
   golfers: TeamGolfer[];
 }
+
+// Module-level cache keyed by tournamentId — survives tab switches
+const _tournamentCache = new Map<string, { tournament: TournamentData; teams: Team[] }>();
 
 const POINTS_MAP: Record<number, number> = { 1: 200, 2: 100, 3: 50 };
 
@@ -127,14 +132,16 @@ function buildTeams(members: MemberPick[], results: GolferResult[]): Team[] {
 export default function TournamentPage() {
   const params = useParams();
   const tournamentId = params.id as string;
+  const cached = _tournamentCache.get(tournamentId);
 
-  const [tournament, setTournament] = useState<TournamentData | null>(null);
+  const [tournament, setTournament] = useState<TournamentData | null>(cached?.tournament ?? null);
   const [leagueId, setLeagueId] = useState<string>('');
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [teams, setTeams] = useState<Team[]>(cached?.teams ?? []);
+  const [loading, setLoading] = useState(!cached);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
 
   const fetchTournament = useCallback(async () => {
     try {
@@ -173,6 +180,8 @@ export default function TournamentPage() {
         const data = await res.json();
         const builtTeams = buildTeams(data.members || [], t.results || []);
         setTeams(builtTeams);
+        // Save to module cache
+        _tournamentCache.set(tournamentId, { tournament: t, teams: builtTeams });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load picks');
       }
@@ -182,13 +191,13 @@ export default function TournamentPage() {
 
   useEffect(() => {
     async function init() {
-      setLoading(true);
+      if (!_tournamentCache.has(tournamentId)) setLoading(true);
       const t = await fetchTournament();
       if (t && leagueId) await fetchPicksAndBuild(t);
       setLoading(false);
     }
     if (leagueId) init();
-  }, [leagueId, fetchTournament, fetchPicksAndBuild]);
+  }, [leagueId, tournamentId, fetchTournament, fetchPicksAndBuild]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
