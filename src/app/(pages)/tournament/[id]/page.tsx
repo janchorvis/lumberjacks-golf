@@ -303,21 +303,25 @@ export default function TournamentPage() {
           {teams.map((team, teamIdx) => (
             <div key={team.userId}>
               {/* Team header row */}
-              <div className="grid grid-cols-[2rem_1fr_3rem_2.5rem_2rem_2rem_2rem_2rem] gap-x-1 px-3 py-2.5 bg-augusta-green/90 border-b border-augusta-green/20">
-                <span className="text-xs font-bold text-white text-center self-center">{teamIdx + 1}</span>
-                <span className="text-sm font-bold text-white self-center truncate">{team.username}</span>
-                <span className={`text-sm font-bold text-right self-center ${
-                  hasAnyScores
-                    ? team.totalScore < 0 ? 'text-yellow-300' : team.totalScore > 0 ? 'text-white/70' : 'text-white'
-                    : 'text-white/50'
-                }`}>
-                  {hasAnyScores ? formatScore(team.totalScore) : '--'}
-                </span>
-                {team.points > 0 && (
-                  <span className="col-span-4 text-[10px] text-yellow-300 font-semibold text-right self-center">
-                    {team.points} pts
+              <div className="flex items-center justify-between px-3 py-2.5 bg-augusta-green/90 border-b border-augusta-green/20">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-xs font-bold text-white shrink-0 w-5 text-center">{teamIdx + 1}</span>
+                  <span className="text-sm font-bold text-white">{team.username}</span>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className={`text-sm font-bold ${
+                    hasAnyScores
+                      ? team.totalScore < 0 ? 'text-yellow-300' : team.totalScore > 0 ? 'text-white/70' : 'text-white'
+                      : 'text-white/50'
+                  }`}>
+                    {hasAnyScores ? formatScore(team.totalScore) : '--'}
                   </span>
-                )}
+                  {team.points > 0 && (
+                    <span className="text-[10px] text-yellow-300 font-semibold">
+                      {team.points} pts
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Golfer rows */}
