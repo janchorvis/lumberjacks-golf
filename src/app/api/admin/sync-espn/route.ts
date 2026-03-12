@@ -101,7 +101,12 @@ export async function POST(request: NextRequest) {
       score: string;
       status?: string;
       order?: number;
-      linescores?: { period: number; value?: number; displayValue?: string }[];
+      linescores?: {
+        period: number;
+        value?: number;
+        displayValue?: string;
+        linescores?: { period: number; value?: number; displayValue?: string }[];
+      }[];
     }[] = competition.competitors ?? [];
 
     // Load tournament field for fuzzy matching
@@ -151,16 +156,35 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // Parse round scores from linescores
+      // Parse round scores and thru from nested linescores
+      // ESPN: round linescore.value = stroke total, linescore.linescores = hole-by-hole
       const rounds: Record<number, number | null> = { 1: null, 2: null, 3: null, 4: null };
+      let thru: number | null = null;
+      let activeRound = 0;
+
       for (const ls of comp.linescores ?? []) {
-        if (ls.period >= 1 && ls.period <= 4) {
-          const strokes = ls.displayValue ? parseInt(ls.displayValue, 10) : null;
-          rounds[ls.period] = strokes && !isNaN(strokes) ? strokes : null;
+        if (ls.period < 1 || ls.period > 4) continue;
+        // value = stroke total for the round (e.g. 67)
+        const strokes = ls.value != null ? Math.round(ls.value) : null;
+        const holeCount = ls.linescores?.length ?? 0;
+
+        if (strokes != null && holeCount === 18) {
+          // Completed round
+          rounds[ls.period] = strokes;
+        } else if (holeCount > 0) {
+          // In-progress round: store partial stroke count
+          rounds[ls.period] = strokes;
+          activeRound = ls.period;
+          thru = holeCount; // holes completed this round
+        } else if (strokes != null) {
+          rounds[ls.period] = strokes;
         }
       }
 
-      const completedRounds = (comp.linescores ?? []).filter(ls => ls.displayValue).length;
+      // If all rounds are complete, thru = 18 (F)
+      if (thru === null && Object.values(rounds).some(r => r != null)) {
+        thru = 18;
+      }
 
       toUpsert.push({
         golferId: bestMatch.golferId,
@@ -171,7 +195,7 @@ export async function POST(request: NextRequest) {
         scoreToPar: parseScoreToPar(comp.score),
         status: parseStatus(comp.status),
         position: comp.order ?? null,
-        thru: completedRounds > 0 ? 18 : null,
+        thru,
       });
     }
 
