@@ -47,10 +47,15 @@ function fuzzyMatch(input: string, candidate: string): number {
 }
 
 export async function POST(request: NextRequest) {
-  // Allow cron secret or admin user
+  // Allow cron secret (header or query param) or admin user
   const authHeader = request.headers.get('authorization');
+  const { searchParams } = new URL(request.url);
+  const querySecret = searchParams.get('secret');
   const cronSecret = process.env.CRON_SECRET;
-  const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
+  const isCron = cronSecret && (
+    authHeader === `Bearer ${cronSecret}` ||
+    querySecret === cronSecret
+  );
 
   if (!isCron) {
     const user = await getCurrentUser();
