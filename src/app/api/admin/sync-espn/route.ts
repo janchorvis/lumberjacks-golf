@@ -115,9 +115,21 @@ export async function POST(request: NextRequest) {
       golferName: e.golfer.name,
     }));
 
-    let updated = 0;
     let notFound = 0;
-    const errors: string[] = [];
+
+    // Build all upsert data first (pure JS, no DB calls)
+    type UpsertData = {
+      golferId: string;
+      r1Score: number | null;
+      r2Score: number | null;
+      r3Score: number | null;
+      r4Score: number | null;
+      scoreToPar: number;
+      status: string;
+      position: number | null;
+      thru: number | null;
+    };
+    const toUpsert: UpsertData[] = [];
 
     for (const comp of competitors) {
       const name = comp.athlete?.displayName;
@@ -143,63 +155,43 @@ export async function POST(request: NextRequest) {
       const rounds: Record<number, number | null> = { 1: null, 2: null, 3: null, 4: null };
       for (const ls of comp.linescores ?? []) {
         if (ls.period >= 1 && ls.period <= 4) {
-          // displayValue is stroke total (e.g. "68"), value may be score to par
           const strokes = ls.displayValue ? parseInt(ls.displayValue, 10) : null;
           rounds[ls.period] = strokes && !isNaN(strokes) ? strokes : null;
         }
       }
 
-      const scoreToPar = parseScoreToPar(comp.score);
-      const status = parseStatus(comp.status);
-      const position = comp.order ?? null;
-      // Estimate thru from linescores (no per-golfer API calls — too slow)
       const completedRounds = (comp.linescores ?? []).filter(ls => ls.displayValue).length;
-      const thru = completedRounds > 0 ? 18 : null;
 
-      try {
-        await prisma.tournamentResult.upsert({
-          where: {
-            tournamentId_golferId: {
-              tournamentId: tournament.id,
-              golferId: bestMatch.golferId,
-            },
-          },
-          create: {
-            tournamentId: tournament.id,
-            golferId: bestMatch.golferId,
-            r1Score: rounds[1],
-            r2Score: rounds[2],
-            r3Score: rounds[3],
-            r4Score: rounds[4],
-            scoreToPar,
-            status,
-            position,
-            thru,
-          },
-          update: {
-            r1Score: rounds[1],
-            r2Score: rounds[2],
-            r3Score: rounds[3],
-            r4Score: rounds[4],
-            scoreToPar,
-            status,
-            position,
-            thru,
-          },
-        });
-        updated++;
-      } catch (e) {
-        errors.push(`${name}: ${e}`);
-      }
+      toUpsert.push({
+        golferId: bestMatch.golferId,
+        r1Score: rounds[1],
+        r2Score: rounds[2],
+        r3Score: rounds[3],
+        r4Score: rounds[4],
+        scoreToPar: parseScoreToPar(comp.score),
+        status: parseStatus(comp.status),
+        position: comp.order ?? null,
+        thru: completedRounds > 0 ? 18 : null,
+      });
     }
 
+    // Batch upsert in a single transaction
+    await prisma.$transaction(
+      toUpsert.map((d) =>
+        prisma.tournamentResult.upsert({
+          where: { tournamentId_golferId: { tournamentId: tournament.id, golferId: d.golferId } },
+          create: { tournamentId: tournament.id, ...d },
+          update: d,
+        })
+      )
+    );
+
     return NextResponse.json({
-      message: `Synced ${updated} golfers from ESPN (${notFound} not matched)`,
+      message: `Synced ${toUpsert.length} golfers from ESPN (${notFound} not matched)`,
       tournament: tournament.name,
       espnEvent: espnEvent.name,
-      updated,
+      updated: toUpsert.length,
       notFound,
-      errors: errors.slice(0, 10),
     });
   } catch (error) {
     console.error('ESPN sync error:', error);
