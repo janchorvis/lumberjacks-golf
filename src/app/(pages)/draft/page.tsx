@@ -70,6 +70,12 @@ export default function DraftPage() {
   const [creating, setCreating] = useState(false);
   const [noDraft, setNoDraft] = useState(false);
 
+  // Auto-draft queue
+  const [queueOpen, setQueueOpen] = useState(false);
+  const [queueEnabled, setQueueEnabled] = useState(false);
+  const [queueGolferIds, setQueueGolferIds] = useState<string[]>([]);
+  const [savingQueue, setSavingQueue] = useState(false);
+
   const fetchDraft = useCallback(async () => {
     try {
       const meRes = await fetch('/api/auth/me');
@@ -96,6 +102,13 @@ export default function DraftPage() {
         const draftData = await draftRes.json();
         setDraft(draftData.draft);
         setNoDraft(false);
+        // Load auto-queue state
+        const queueRes = await fetch(`/api/draft/${tournamentId}/queue`);
+        if (queueRes.ok) {
+          const qd = await queueRes.json();
+          setQueueEnabled(qd.queue?.enabled ?? false);
+          setQueueGolferIds(qd.queue?.golferIds ?? []);
+        }
       } else {
         setNoDraft(true);
         if (meData.user.isAdmin) {
@@ -414,6 +427,166 @@ export default function DraftPage() {
             </p>
             <p className="text-xs text-gray-400">Auto-refreshes every 5s</p>
           </div>
+        </Card>
+      )}
+
+      {/* Auto-Draft Queue */}
+      {draft.status === 'active' && (
+        <Card className="overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-gray-800">Auto-Draft Queue</span>
+              {queueGolferIds.length > 0 && (
+                <span className="text-[10px] bg-augusta-green/10 text-augusta-green font-semibold px-2 py-0.5 rounded-full">
+                  {queueGolferIds.length} queued
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {/* Toggle */}
+              <button
+                onClick={async () => {
+                  const newEnabled = !queueEnabled;
+                  setQueueEnabled(newEnabled);
+                  await fetch(`/api/draft/${draft.tournamentId}/queue`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: newEnabled }),
+                  });
+                }}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                  queueEnabled ? 'bg-augusta-green' : 'bg-gray-300'
+                }`}
+              >
+                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow ${
+                  queueEnabled ? 'translate-x-4' : 'translate-x-1'
+                }`} />
+              </button>
+              <button
+                onClick={() => setQueueOpen(!queueOpen)}
+                className="text-xs text-augusta-green font-medium"
+              >
+                {queueOpen ? 'Done' : 'Edit'}
+              </button>
+            </div>
+          </div>
+
+          {queueEnabled && !queueOpen && queueGolferIds.length > 0 && (
+            <div className="px-4 py-2 space-y-1">
+              {queueGolferIds.slice(0, 5).map((gid, i) => {
+                const g = draft.availableGolfers.find(a => a.golferId === gid);
+                const label = g ? g.name : '(already drafted)';
+                const unavailable = !g;
+                return (
+                  <div key={gid} className={`flex items-center gap-2 text-xs ${unavailable ? 'text-gray-300 line-through' : 'text-gray-700'}`}>
+                    <span className="w-4 text-gray-400 text-right">{i + 1}.</span>
+                    <span>{label}</span>
+                  </div>
+                );
+              })}
+              {queueGolferIds.length > 5 && (
+                <p className="text-xs text-gray-400 pl-6">+{queueGolferIds.length - 5} more</p>
+              )}
+            </div>
+          )}
+
+          {!queueEnabled && !queueOpen && (
+            <p className="px-4 py-3 text-xs text-gray-400">
+              Off — you&apos;ll pick manually when it&apos;s your turn.
+            </p>
+          )}
+
+          {queueOpen && (
+            <div className="px-4 py-3 space-y-3">
+              <p className="text-xs text-gray-500">
+                Add golfers in priority order. When it&apos;s your turn, the system auto-picks your top available golfer.
+              </p>
+
+              {/* Current queue */}
+              {queueGolferIds.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase">Your Queue</p>
+                  {queueGolferIds.map((gid, i) => {
+                    const g = sortedGolfers.find(a => a.golferId === gid) ??
+                      draft.availableGolfers.find(a => a.golferId === gid);
+                    return (
+                      <div key={gid} className="flex items-center gap-2">
+                        <span className="w-5 text-xs text-gray-400 text-right">{i + 1}.</span>
+                        <span className="text-sm flex-1 text-gray-800">{g?.name ?? gid}</span>
+                        <div className="flex gap-1">
+                          {i > 0 && (
+                            <button onClick={() => {
+                              const updated = [...queueGolferIds];
+                              [updated[i - 1], updated[i]] = [updated[i], updated[i - 1]];
+                              setQueueGolferIds(updated);
+                            }} className="text-gray-400 hover:text-gray-600 px-1">↑</button>
+                          )}
+                          {i < queueGolferIds.length - 1 && (
+                            <button onClick={() => {
+                              const updated = [...queueGolferIds];
+                              [updated[i], updated[i + 1]] = [updated[i + 1], updated[i]];
+                              setQueueGolferIds(updated);
+                            }} className="text-gray-400 hover:text-gray-600 px-1">↓</button>
+                          )}
+                          <button onClick={() => setQueueGolferIds(queueGolferIds.filter((_, idx) => idx !== i))}
+                            className="text-red-400 hover:text-red-600 px-1 text-xs">✕</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Add from available */}
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase mb-1">Add Golfer</p>
+                <input
+                  type="text"
+                  placeholder="Search golfers..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-augusta-green"
+                />
+                <div className="mt-1 max-h-40 overflow-y-auto space-y-0.5">
+                  {filteredGolfers
+                    .filter(g => !queueGolferIds.includes(g.golferId))
+                    .slice(0, 20)
+                    .map(g => (
+                      <button
+                        key={g.golferId}
+                        onClick={() => setQueueGolferIds([...queueGolferIds, g.golferId])}
+                        className="w-full text-left px-2 py-1.5 text-sm hover:bg-augusta-green/5 rounded flex items-center gap-2"
+                      >
+                        {g.ranking && <span className="text-xs text-gray-400 w-5 text-right">{g.ranking}</span>}
+                        <span className="text-gray-800">{g.name}</span>
+                        <span className="ml-auto text-augusta-green text-xs">+</span>
+                      </button>
+                    ))}
+                </div>
+              </div>
+
+              {/* Save */}
+              <Button
+                variant="primary"
+                size="sm"
+                loading={savingQueue}
+                onClick={async () => {
+                  setSavingQueue(true);
+                  await fetch(`/api/draft/${draft.tournamentId}/queue`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ golferIds: queueGolferIds, enabled: true }),
+                  });
+                  setQueueEnabled(true);
+                  setSavingQueue(false);
+                  setQueueOpen(false);
+                }}
+                className="w-full"
+              >
+                Save Queue & Enable Auto-Draft
+              </Button>
+            </div>
+          )}
         </Card>
       )}
 

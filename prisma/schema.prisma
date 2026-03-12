@@ -21,6 +21,7 @@ model User {
   leagueMembers LeagueMember[]
   createdLeagues League[]     @relation("CreatedBy")
   draftPicks     DraftPick[]
+  autoQueues     AutoDraftQueue[]
 }
 
 model Session {
@@ -167,6 +168,7 @@ model Draft {
   league           League      @relation(fields: [leagueId], references: [id])
   tournament       Tournament  @relation(fields: [tournamentId], references: [id])
   picks            DraftPick[]
+  autoQueues       AutoDraftQueue[]
 
   @@unique([leagueId, tournamentId])
 }
@@ -182,4 +184,17 @@ model DraftPick {
   draft      Draft    @relation(fields: [draftId], references: [id])
   user       User     @relation(fields: [userId], references: [id])
   golfer     Golfer   @relation(fields: [golferId], references: [id])
+}
+
+model AutoDraftQueue {
+  id         String   @id @default(cuid())
+  draftId    String
+  userId     String
+  enabled    Boolean  @default(true)  // true when queue is set; user can toggle off
+  queueOrder String   @default("[]")  // JSON array of golferIds in priority order
+  updatedAt  DateTime @updatedAt
+  draft      Draft    @relation(fields: [draftId], references: [id])
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@unique([draftId, userId])
 }
