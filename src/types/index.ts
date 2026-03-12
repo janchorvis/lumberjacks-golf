@@ -37,6 +37,7 @@ export interface GolferResult {
   r3Score: number | null;
   r4Score: number | null;
   status: string;
+  thru: number | null;
 }
 
 export interface LeagueWithMembers {

@@ -40,6 +40,7 @@ interface TeamGolfer {
   isCounting: boolean;
   status: string;
   position: number | null;
+  thru: number | null;
 }
 
 interface Team {
@@ -82,6 +83,7 @@ function buildTeams(members: MemberPick[], results: GolferResult[]): Team[] {
           r4: result?.r4Score ?? null,
           status: result?.status ?? 'active',
           position: result?.position ?? null,
+          thru: result?.thru ?? null,
           _sort: result?.scoreToPar ?? 999,
         };
       });
@@ -100,6 +102,7 @@ function buildTeams(members: MemberPick[], results: GolferResult[]): Team[] {
         isCounting: anyScores ? sorted.indexOf(g) < 4 : true,
         status: g.status,
         position: g.position,
+        thru: g.thru,
       }));
 
       if (anyScores) {
@@ -286,10 +289,11 @@ export default function TournamentPage() {
       {teams.length > 0 && (
         <div className="rounded-xl border border-gray-200 overflow-hidden bg-white">
           {/* Column headers */}
-          <div className="grid grid-cols-[2rem_1fr_3rem_2rem_2rem_2rem_2rem] gap-x-1 px-3 py-2 bg-gray-100 border-b border-gray-200">
+          <div className="grid grid-cols-[2rem_1fr_3rem_2.5rem_2rem_2rem_2rem_2rem] gap-x-1 px-3 py-2 bg-gray-100 border-b border-gray-200">
             <span className="text-[10px] font-semibold text-gray-400 uppercase text-center">POS</span>
             <span className="text-[10px] font-semibold text-gray-400 uppercase">GOLFER</span>
             <span className="text-[10px] font-semibold text-gray-400 uppercase text-right">TOT</span>
+            <span className="text-[10px] font-semibold text-gray-400 uppercase text-right">THR</span>
             <span className="text-[10px] font-semibold text-gray-400 uppercase text-right">R1</span>
             <span className="text-[10px] font-semibold text-gray-400 uppercase text-right">R2</span>
             <span className="text-[10px] font-semibold text-gray-400 uppercase text-right">R3</span>
@@ -299,7 +303,7 @@ export default function TournamentPage() {
           {teams.map((team, teamIdx) => (
             <div key={team.userId}>
               {/* Team header row */}
-              <div className="grid grid-cols-[2rem_1fr_3rem_2rem_2rem_2rem_2rem] gap-x-1 px-3 py-2.5 bg-augusta-green/90 border-b border-augusta-green/20">
+              <div className="grid grid-cols-[2rem_1fr_3rem_2.5rem_2rem_2rem_2rem_2rem] gap-x-1 px-3 py-2.5 bg-augusta-green/90 border-b border-augusta-green/20">
                 <span className="text-xs font-bold text-white text-center self-center">{teamIdx + 1}</span>
                 <span className="text-sm font-bold text-white self-center truncate">{team.username}</span>
                 <span className={`text-sm font-bold text-right self-center ${
@@ -332,7 +336,7 @@ export default function TournamentPage() {
                 return (
                   <div
                     key={gi}
-                    className={`grid grid-cols-[2rem_1fr_3rem_2rem_2rem_2rem_2rem] gap-x-1 px-3 py-2 border-b border-gray-50 last:border-0 ${
+                    className={`grid grid-cols-[2rem_1fr_3rem_2.5rem_2rem_2rem_2rem_2rem] gap-x-1 px-3 py-2 border-b border-gray-50 last:border-0 ${
                       g.isCounting ? 'bg-white' : 'bg-gray-50/50'
                     }`}
                   >
@@ -356,6 +360,11 @@ export default function TournamentPage() {
                     {/* TOT */}
                     <span className={`text-xs font-semibold text-right self-center ${scoreColor}`}>
                       {formatScore(g.scoreToPar)}
+                    </span>
+
+                    {/* THR */}
+                    <span className={`text-xs text-right self-center ${isDropped ? 'text-gray-300' : 'text-gray-400'}`}>
+                      {g.thru === 18 ? 'F' : g.thru != null && g.thru > 0 ? g.thru : '--'}
                     </span>
 
                     {/* R1–R4 */}

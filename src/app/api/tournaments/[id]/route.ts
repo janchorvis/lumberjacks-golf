@@ -55,6 +55,7 @@ export async function GET(
         r3Score: r.r3Score,
         r4Score: r.r4Score,
         status: r.status,
+        thru: r.thru,
       })),
     });
   } catch (error) {

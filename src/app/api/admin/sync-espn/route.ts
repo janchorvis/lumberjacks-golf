@@ -91,12 +91,37 @@ export async function POST(request: NextRequest) {
     }
 
     const competitors: {
+      id?: string;
       athlete: { displayName: string };
       score: string;
       status?: string;
       order?: number;
       linescores?: { period: number; value?: number; displayValue?: string }[];
     }[] = competition.competitors ?? [];
+
+    // Fetch thru data from ESPN status endpoint in parallel (for all competitors)
+    // This gives us holes completed in current round
+    const espnEventId = tournament.externalId!;
+    const thruMap = new Map<string, number>();
+    try {
+      const statusResults = await Promise.allSettled(
+        competitors
+          .filter(c => c.id)
+          .map(async (c) => {
+            const r = await fetch(
+              `http://sports.core.api.espn.com/v2/sports/golf/leagues/pga/events/${espnEventId}/competitions/${espnEventId}/competitors/${c.id}/status?lang=en&region=us`,
+              { signal: AbortSignal.timeout(5000) }
+            );
+            if (!r.ok) return;
+            const d = await r.json();
+            const thru: number = d.thru ?? 0;
+            thruMap.set(c.id!, thru);
+          })
+      );
+      void statusResults; // we just need the side effects
+    } catch {
+      // Non-fatal — thru data is nice-to-have
+    }
 
     // Load tournament field for fuzzy matching
     const fieldEntries = await prisma.tournamentField.findMany({
@@ -146,6 +171,10 @@ export async function POST(request: NextRequest) {
       const scoreToPar = parseScoreToPar(comp.score);
       const status = parseStatus(comp.status);
       const position = comp.order ?? null;
+      // thru from ESPN status endpoint; fall back to 18 if a round's linescore is complete
+      const thruFromStatus = comp.id ? (thruMap.get(comp.id) ?? null) : null;
+      const completedRounds = (comp.linescores ?? []).filter(ls => ls.displayValue).length;
+      const thru = thruFromStatus ?? (completedRounds > 0 ? 18 : null);
 
       try {
         await prisma.tournamentResult.upsert({
@@ -165,6 +194,7 @@ export async function POST(request: NextRequest) {
             scoreToPar,
             status,
             position,
+            thru,
           },
           update: {
             r1Score: rounds[1],
@@ -174,6 +204,7 @@ export async function POST(request: NextRequest) {
             scoreToPar,
             status,
             position,
+            thru,
           },
         });
         updated++;

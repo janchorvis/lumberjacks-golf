@@ -91,6 +91,7 @@ model TournamentResult {
   r2Score      Int?
   r3Score      Int?
   r4Score      Int?
+  thru         Int?       // holes completed in current round (0-18); null = pre-tournament
   status       String     @default("active") // active, cut, wd, dq
   tournament   Tournament @relation(fields: [tournamentId], references: [id])
   golfer       Golfer     @relation(fields: [golferId], references: [id])
