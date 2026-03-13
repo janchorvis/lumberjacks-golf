@@ -190,8 +190,8 @@ export async function POST(request: NextRequest) {
       const detectedStatus =
         parsedStatus !== 'active'
           ? parsedStatus
-          : hasAnyLinescore && !hasAnyValidRound
-          ? 'wd' // Has ESPN data but no valid stroke totals = withdrew before completing a round
+          : hasAnyLinescore && !hasAnyValidRound && thru === null
+          ? 'wd' // Has linescore data but no valid stroke totals AND no holes-in-progress = WD
           : 'active';
 
       // If all rounds are complete, thru = 18 (F)
