@@ -350,7 +350,7 @@ export default function TournamentPage() {
                     </span>
 
                     {/* Name */}
-                    <span className={`text-xs self-center truncate pr-1 ${
+                    <span className={`text-xs self-center leading-tight ${
                       isDropped ? 'line-through text-gray-300' : 'text-gray-800'
                     }`}>
                       {g.name}
