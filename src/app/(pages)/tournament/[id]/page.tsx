@@ -90,7 +90,12 @@ function buildTeams(members: MemberPick[], results: GolferResult[]): Team[] {
 
       // Only determine counting golfers if at least one has a real score
       const anyScores = golferScores.some(g => g.scoreToPar != null);
-      const sorted = [...golferScores].sort((a, b) => a._sort - b._sort);
+      const isInactive = (s: string) => ['wd', 'dq', 'WD', 'DQ'].includes(s);
+
+      // WD/DQ golfers are never eligible to count — exclude them before picking best 4
+      const eligible = golferScores.filter(g => !isInactive(g.status));
+      const sortedEligible = [...eligible].sort((a, b) => a._sort - b._sort);
+      const countingSet = new Set(sortedEligible.slice(0, 4));
 
       const golfers: TeamGolfer[] = golferScores.map((g) => ({
         name: g.name,
@@ -99,7 +104,7 @@ function buildTeams(members: MemberPick[], results: GolferResult[]): Team[] {
         r2: g.r2,
         r3: g.r3,
         r4: g.r4,
-        isCounting: anyScores ? sorted.indexOf(g) < 4 : true,
+        isCounting: anyScores ? countingSet.has(g) : !isInactive(g.status),
         status: g.status,
         position: g.position,
         thru: g.thru,
@@ -112,7 +117,7 @@ function buildTeams(members: MemberPick[], results: GolferResult[]): Team[] {
         });
       }
 
-      const countingScores = anyScores ? sorted.slice(0, 4) : [];
+      const countingScores = anyScores ? sortedEligible.slice(0, 4) : [];
       const totalScore = anyScores
         ? countingScores.reduce((sum, g) => sum + (g.scoreToPar ?? 0), 0)
         : 0;
