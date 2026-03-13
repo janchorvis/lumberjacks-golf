@@ -141,6 +141,22 @@ export default function RulesPage() {
         </div>
       </Card>
 
+      {/* Winner Bonus */}
+      <Card>
+        <div className="p-6 space-y-3">
+          <h2 className="text-lg font-bold text-augusta-green">🏆 Winner Bonus</h2>
+          <p className="text-sm text-gray-700 leading-relaxed">
+            The team that drafted the <strong>tournament winner</strong> earns a bonus{' '}
+            <strong>+100 points</strong> — regardless of where their team finished in the
+            weekly standings. It pays to have the champ on your roster.
+          </p>
+          <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 space-y-1">
+            <p className="font-medium">Example: Your team finishes 3rd (50 pts), but you had the winner</p>
+            <p>50 pts (3rd place) + 100 pts (winner bonus) = <strong className="text-augusta-green">150 pts</strong></p>
+          </div>
+        </div>
+      </Card>
+
       {/* Tiebreakers */}
       <Card>
         <div className="p-6 space-y-3">
