@@ -40,6 +40,7 @@ interface TeamGolfer {
   isCounting: boolean;
   status: string;
   position: number | null;
+  posDisplay: string;
   thru: number | null;
 }
 
@@ -66,8 +67,21 @@ function formatRound(score: number | null): string {
   return score != null ? String(score) : '-';
 }
 
+function formatPosition(pos: number | null, tiedMap: Map<number, boolean>): string {
+  if (pos == null) return '';
+  return tiedMap.get(pos) ? `T${pos}` : `${pos}`;
+}
+
 function buildTeams(members: MemberPick[], results: GolferResult[]): Team[] {
   const resultMap = new Map(results.map((r) => [r.golferId, r]));
+
+  // Build tie map from full field results
+  const posCounts = new Map<number, number>();
+  for (const r of results) {
+    if (r.position != null) posCounts.set(r.position, (posCounts.get(r.position) ?? 0) + 1);
+  }
+  const tiedMap = new Map<number, boolean>();
+  posCounts.forEach((count, pos) => tiedMap.set(pos, count > 1));
 
   const teams = members
     .filter((m) => m.picks.length > 0)
@@ -107,6 +121,7 @@ function buildTeams(members: MemberPick[], results: GolferResult[]): Team[] {
         isCounting: anyScores ? countingSet.has(g) : !isInactive(g.status),
         status: g.status,
         position: g.position,
+        posDisplay: formatPosition(g.position, tiedMap),
         thru: g.thru,
       }));
 
@@ -294,8 +309,7 @@ export default function TournamentPage() {
       {teams.length > 0 && (
         <div className="rounded-xl border border-gray-200 overflow-hidden bg-white">
           {/* Column headers */}
-          <div className="grid grid-cols-[2rem_1fr_3rem_2.5rem_2rem_2rem_2rem_2rem] gap-x-1 px-3 py-2 bg-gray-100 border-b border-gray-200">
-            <span className="text-[10px] font-semibold text-gray-400 uppercase text-center">POS</span>
+          <div className="grid grid-cols-[1fr_3rem_2.5rem_2rem_2rem_2rem_2rem] gap-x-1 px-3 py-2 bg-gray-100 border-b border-gray-200">
             <span className="text-[10px] font-semibold text-gray-400 uppercase">GOLFER</span>
             <span className="text-[10px] font-semibold text-gray-400 uppercase text-right">TOT</span>
             <span className="text-[10px] font-semibold text-gray-400 uppercase text-right">THR</span>
@@ -345,20 +359,20 @@ export default function TournamentPage() {
                 return (
                   <div
                     key={gi}
-                    className={`grid grid-cols-[2rem_1fr_3rem_2.5rem_2rem_2rem_2rem_2rem] gap-x-1 px-3 py-2 border-b border-gray-50 last:border-0 ${
+                    className={`grid grid-cols-[1fr_3rem_2.5rem_2rem_2rem_2rem_2rem] gap-x-1 px-3 py-2 border-b border-gray-50 last:border-0 ${
                       g.isCounting ? 'bg-white' : 'bg-gray-50/50'
                     }`}
                   >
-                    {/* Position */}
-                    <span className={`text-xs text-center self-center ${isDropped ? 'text-gray-300' : 'text-gray-400'}`}>
-                      {g.position ?? '--'}
-                    </span>
-
-                    {/* Name */}
+                    {/* Name + position */}
                     <span className={`text-xs self-center leading-tight ${
                       isDropped ? 'line-through text-gray-300' : 'text-gray-800'
                     }`}>
                       {g.name}
+                      {g.posDisplay && (
+                        <span className={`ml-1 text-[10px] font-medium ${isDropped ? 'text-gray-300' : 'text-gray-400'}`} style={{textDecoration:'none'}}>
+                          ({g.posDisplay})
+                        </span>
+                      )}
                       {isCut && !isDropped && (
                         <span className="ml-1 text-[9px] text-red-400 font-bold no-underline" style={{textDecoration:'none'}}>
                           {g.status.toUpperCase()}
