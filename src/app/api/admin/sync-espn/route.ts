@@ -122,6 +122,17 @@ export async function POST(request: NextRequest) {
 
     let notFound = 0;
 
+    // Load existing results so we can preserve manually-set WD/DQ statuses
+    const existingResults = await prisma.tournamentResult.findMany({
+      where: { tournamentId: tournament.id },
+      select: { golferId: true, status: true },
+    });
+    const lockedStatuses = new Set(
+      existingResults
+        .filter(r => r.status === 'wd' || r.status === 'dq')
+        .map(r => r.golferId)
+    );
+
     // Build all upsert data first (pure JS, no DB calls)
     type UpsertData = {
       golferId: string;
@@ -182,22 +193,18 @@ export async function POST(request: NextRequest) {
         // If rawValue < 60 and no hole data, ignore — likely WD/partial/placeholder
       }
 
-      // Detect WD: no status field from ESPN, but has linescore data with only invalid
-      // stroke values (holes played < 60) — golfer withdrew mid-round
-      const hasAnyLinescore = (comp.linescores ?? []).length > 0;
       const hasAnyValidRound = Object.values(rounds).some(v => v != null);
-      const parsedStatus = parseStatus(comp.status);
-      const detectedStatus =
-        parsedStatus !== 'active'
-          ? parsedStatus
-          : hasAnyLinescore && !hasAnyValidRound && thru === null
-          ? 'wd' // Has linescore data but no valid stroke totals AND no holes-in-progress = WD
-          : 'active';
 
       // If all rounds are complete, thru = 18 (F)
       if (thru === null && hasAnyValidRound) {
         thru = 18;
       }
+
+      // Preserve manually-set WD/DQ — never let ESPN overwrite back to active.
+      // CUTs are detected from ESPN's explicit status strings.
+      // WDs that ESPN doesn't report are set manually once and stay locked.
+      const espnStatus = parseStatus(comp.status);
+      const finalStatus = lockedStatuses.has(bestMatch.golferId) ? 'wd' : espnStatus;
 
       toUpsert.push({
         golferId: bestMatch.golferId,
@@ -205,8 +212,8 @@ export async function POST(request: NextRequest) {
         r2Score: rounds[2],
         r3Score: rounds[3],
         r4Score: rounds[4],
-        scoreToPar: hasAnyValidRound ? parseScoreToPar(comp.score) : 0,
-        status: detectedStatus,
+        scoreToPar: parseScoreToPar(comp.score),
+        status: finalStatus,
         position: comp.order ?? null,
         thru,
       });
