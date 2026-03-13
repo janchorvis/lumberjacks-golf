@@ -163,24 +163,39 @@ export async function POST(request: NextRequest) {
 
       for (const ls of comp.linescores ?? []) {
         if (ls.period < 1 || ls.period > 4) continue;
-        // value = stroke total for the round (e.g. 67)
-        const strokes = ls.value != null ? Math.round(ls.value) : null;
+        const rawValue = ls.value != null ? Math.round(ls.value) : null;
         const holeCount = ls.linescores?.length ?? 0;
+        // Valid stroke totals are always >= 60. Values < 60 with no hole-by-hole data
+        // indicate holes played or ESPN placeholder data (e.g. WD after a few holes).
+        const isValidStrokeTotal = rawValue != null && rawValue >= 60;
 
-        if (strokes != null && holeCount === 18) {
+        if (isValidStrokeTotal && holeCount === 18) {
           // Completed round
-          rounds[ls.period] = strokes;
+          rounds[ls.period] = rawValue;
         } else if (holeCount > 0) {
-          // In-progress round
-          rounds[ls.period] = strokes;
-          thru = holeCount; // holes completed this round
-        } else if (strokes != null) {
-          rounds[ls.period] = strokes;
+          // In-progress round — only record score if it looks like a real stroke total
+          if (isValidStrokeTotal) rounds[ls.period] = rawValue;
+          thru = holeCount;
+        } else if (isValidStrokeTotal) {
+          rounds[ls.period] = rawValue;
         }
+        // If rawValue < 60 and no hole data, ignore — likely WD/partial/placeholder
       }
 
+      // Detect WD: no status field from ESPN, but has linescore data with only invalid
+      // stroke values (holes played < 60) — golfer withdrew mid-round
+      const hasAnyLinescore = (comp.linescores ?? []).length > 0;
+      const hasAnyValidRound = Object.values(rounds).some(v => v != null);
+      const parsedStatus = parseStatus(comp.status);
+      const detectedStatus =
+        parsedStatus !== 'active'
+          ? parsedStatus
+          : hasAnyLinescore && !hasAnyValidRound
+          ? 'wd' // Has ESPN data but no valid stroke totals = withdrew before completing a round
+          : 'active';
+
       // If all rounds are complete, thru = 18 (F)
-      if (thru === null && Object.values(rounds).some(r => r != null)) {
+      if (thru === null && hasAnyValidRound) {
         thru = 18;
       }
 
@@ -190,8 +205,8 @@ export async function POST(request: NextRequest) {
         r2Score: rounds[2],
         r3Score: rounds[3],
         r4Score: rounds[4],
-        scoreToPar: parseScoreToPar(comp.score),
-        status: parseStatus(comp.status),
+        scoreToPar: hasAnyValidRound ? parseScoreToPar(comp.score) : 0,
+        status: detectedStatus,
         position: comp.order ?? null,
         thru,
       });
