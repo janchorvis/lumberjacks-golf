@@ -31,6 +31,7 @@ interface TournamentData {
 }
 
 interface TeamGolfer {
+  golferId: string;
   name: string;
   scoreToPar: number | null;
   r1: number | null;
@@ -72,7 +73,7 @@ function formatPosition(pos: number | null, tiedMap: Map<number, boolean>): stri
   return tiedMap.get(pos) ? `T${pos}` : `${pos}`;
 }
 
-function buildTeams(members: MemberPick[], results: GolferResult[]): Team[] {
+function buildTeams(members: MemberPick[], results: GolferResult[], isComplete: boolean): Team[] {
   const resultMap = new Map(results.map((r) => [r.golferId, r]));
 
   // Build tie map from full field results
@@ -89,6 +90,7 @@ function buildTeams(members: MemberPick[], results: GolferResult[]): Team[] {
       const golferScores = member.picks.map((pick) => {
         const result = resultMap.get(pick.golferId);
         return {
+          golferId: pick.golferId,
           name: pick.golferName,
           scoreToPar: result?.scoreToPar ?? null,
           r1: result?.r1Score ?? null,
@@ -112,6 +114,7 @@ function buildTeams(members: MemberPick[], results: GolferResult[]): Team[] {
       const countingSet = new Set(sortedEligible.slice(0, 4));
 
       const golfers: TeamGolfer[] = golferScores.map((g) => ({
+        golferId: g.golferId,
         name: g.name,
         scoreToPar: g.scoreToPar,
         r1: g.r1,
@@ -150,6 +153,16 @@ function buildTeams(members: MemberPick[], results: GolferResult[]): Team[] {
     const split = Math.round(totalPts / (j - i));
     for (let k = i; k < j; k++) teams[k].points = split;
     i = j;
+  }
+
+  // Winner bonus: team that has the tournament winner gets +100 pts (applied at final)
+  if (isComplete) {
+    const winnerIds = new Set(results.filter(r => r.position === 1).map(r => r.golferId));
+    for (const team of teams) {
+      if (team.golfers.some(g => winnerIds.has(g.golferId))) {
+        team.points += 100;
+      }
+    }
   }
 
   return teams;
@@ -204,7 +217,7 @@ export default function TournamentPage() {
         const res = await fetch(`/api/picks/${tournamentId}/league/${leagueId}`);
         if (!res.ok) throw new Error('Failed to fetch picks');
         const data = await res.json();
-        const builtTeams = buildTeams(data.members || [], t.results || []);
+        const builtTeams = buildTeams(data.members || [], t.results || [], t.isComplete);
         setTeams(builtTeams);
         // Save to module cache
         _tournamentCache.set(tournamentId, { tournament: t, teams: builtTeams });
@@ -338,6 +351,9 @@ export default function TournamentPage() {
                   {team.points > 0 && (
                     <span className="text-[10px] text-yellow-300 font-semibold">
                       {team.points} pts
+                      {tournament.isComplete && team.golfers.some(g => g.position === 1) && (
+                        <span className="ml-1">+🏆</span>
+                      )}
                     </span>
                   )}
                 </div>
@@ -347,6 +363,7 @@ export default function TournamentPage() {
               {team.golfers.map((g, gi) => {
                 const isDropped = !g.isCounting;
                 const isCut = ['cut', 'wd', 'dq', 'CUT', 'WD', 'DQ'].includes(g.status);
+                const isWinner = tournament.isComplete && g.position === 1;
                 const textColor = isDropped ? 'text-gray-300' : 'text-gray-700';
                 const scoreColor = isDropped
                   ? 'text-gray-300'
@@ -367,8 +384,9 @@ export default function TournamentPage() {
                     <span className={`text-xs self-center leading-tight ${
                       isDropped ? 'line-through text-gray-300' : 'text-gray-800'
                     }`}>
+                      {isWinner && <span className="mr-1" style={{textDecoration:'none'}}>🏆</span>}
                       {g.name}
-                      {g.posDisplay && (
+                      {g.posDisplay && !isWinner && (
                         <span className={`ml-1 text-[10px] font-medium ${isDropped ? 'text-gray-300' : 'text-gray-400'}`} style={{textDecoration:'none'}}>
                           ({g.posDisplay})
                         </span>
