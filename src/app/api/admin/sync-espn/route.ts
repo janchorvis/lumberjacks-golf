@@ -66,14 +66,18 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Find active (non-complete) tournament with an ESPN externalId
+    const forceFinalize = url.searchParams.get('force') === 'true';
+
+    // Find active tournament — if force=true, also check recently completed ones
     const tournament = await prisma.tournament.findFirst({
-      where: { isComplete: false, externalId: { not: null } },
-      orderBy: { startDate: 'asc' },
+      where: forceFinalize
+        ? { externalId: { not: null } }
+        : { isComplete: false, externalId: { not: null } },
+      orderBy: { startDate: 'desc' },
     });
 
     if (!tournament) {
-      return NextResponse.json({ message: 'No active tournament with ESPN ID found' });
+      return NextResponse.json({ message: 'No tournament with ESPN ID found' });
     }
 
     // Fetch ESPN scoreboard
@@ -225,7 +229,7 @@ export async function POST(request: NextRequest) {
     const allR4Done = toUpsert.filter(d => d.status === 'active').every(d => d.r4Score != null);
     const shouldMarkComplete = espnStatusDesc.includes('final') || espnStatusDesc.includes('post') || allR4Done;
 
-    const isFirstComplete = shouldMarkComplete && !tournament.isComplete;
+    const isFirstComplete = (shouldMarkComplete && !tournament.isComplete) || (forceFinalize && shouldMarkComplete);
 
     // Batch upsert + optional complete flag in a single transaction
     await prisma.$transaction([
