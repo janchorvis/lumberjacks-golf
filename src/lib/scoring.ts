@@ -49,7 +49,10 @@ export function calculateBestFour(golfers: GolferScore[]): {
   return { bestFour, dropped, totalScore };
 }
 
-export function calculateWeeklyResults(teams: TeamPicks[]): WeeklyTeamResult[] {
+export function calculateWeeklyResults(
+  teams: TeamPicks[],
+  winnerGolferId?: string | null
+): WeeklyTeamResult[] {
   // Calculate best 4 for each team
   const teamResults = teams.map((team) => {
     const { bestFour, dropped, totalScore } = calculateBestFour(team.golfers);
@@ -62,13 +65,11 @@ export function calculateWeeklyResults(teams: TeamPicks[]): WeeklyTeamResult[] {
   // Assign ranks and points with tiebreaker logic
   let i = 0;
   while (i < teamResults.length) {
-    // Find all teams tied at this score
     let j = i;
     while (j < teamResults.length && teamResults[j].totalScore === teamResults[i].totalScore) {
       j++;
     }
 
-    // Ranks for tied positions
     const tiedCount = j - i;
     let totalPoints = 0;
     for (let k = i; k < j; k++) {
@@ -82,6 +83,18 @@ export function calculateWeeklyResults(teams: TeamPicks[]): WeeklyTeamResult[] {
     }
 
     i = j;
+  }
+
+  // Winner bonus: team that drafted the tournament winner gets +100 pts
+  if (winnerGolferId) {
+    for (const team of teamResults) {
+      const hasWinner = team.bestFour.some((g) => g.golferId === winnerGolferId) ||
+        team.dropped.some((g) => g.golferId === winnerGolferId);
+      if (hasWinner) {
+        team.points += 100;
+        break; // Only one winner
+      }
+    }
   }
 
   return teamResults;

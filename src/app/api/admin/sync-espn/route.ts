@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
+import { calculateWeeklyResults, type TeamPicks, type GolferScore } from '@/lib/scoring';
 
 export const dynamic = 'force-dynamic';
 
@@ -224,6 +225,8 @@ export async function POST(request: NextRequest) {
     const allR4Done = toUpsert.filter(d => d.status === 'active').every(d => d.r4Score != null);
     const shouldMarkComplete = espnStatusDesc.includes('final') || espnStatusDesc.includes('post') || allR4Done;
 
+    const isFirstComplete = shouldMarkComplete && !tournament.isComplete;
+
     // Batch upsert + optional complete flag in a single transaction
     await prisma.$transaction([
       ...toUpsert.map((d) =>
@@ -233,10 +236,63 @@ export async function POST(request: NextRequest) {
           update: d,
         })
       ),
-      ...(shouldMarkComplete && !tournament.isComplete
+      ...(isFirstComplete
         ? [prisma.tournament.update({ where: { id: tournament.id }, data: { isComplete: true } })]
         : []),
     ]);
+
+    // When tournament first completes, finalize WeeklyResults for all leagues
+    let leaguesFinalized = 0;
+    if (isFirstComplete) {
+      const winnerResult = toUpsert.find(d => d.position === 1 && d.status === 'active');
+      const winnerGolferId = winnerResult?.golferId ?? null;
+
+      const leaguesWithPicks = await prisma.pick.findMany({
+        where: { tournamentId: tournament.id },
+        select: { leagueId: true },
+        distinct: ['leagueId'],
+      });
+
+      const resultMap = new Map(toUpsert.map(d => [d.golferId, d]));
+
+      for (const { leagueId } of leaguesWithPicks) {
+        const picks = await prisma.pick.findMany({
+          where: { leagueId, tournamentId: tournament.id },
+          include: { golfer: true },
+        });
+
+        const userPicksMap = new Map<string, typeof picks>();
+        for (const pick of picks) {
+          const existing = userPicksMap.get(pick.userId) || [];
+          existing.push(pick);
+          userPicksMap.set(pick.userId, existing);
+        }
+
+        const teams: TeamPicks[] = Array.from(userPicksMap.entries()).map(([userId, userPicks]) => ({
+          userId,
+          golfers: userPicks.map((p): GolferScore => {
+            const result = resultMap.get(p.golferId);
+            return {
+              golferId: p.golferId,
+              golferName: p.golfer.name,
+              scoreToPar: result?.scoreToPar ?? null,
+              status: (result?.status as GolferScore['status']) ?? 'active',
+            };
+          }),
+        }));
+
+        const weeklyResults = calculateWeeklyResults(teams, winnerGolferId);
+
+        for (const wr of weeklyResults) {
+          await prisma.weeklyResult.upsert({
+            where: { leagueId_userId_tournamentId: { leagueId, userId: wr.userId, tournamentId: tournament.id } },
+            create: { leagueId, userId: wr.userId, tournamentId: tournament.id, totalScore: wr.totalScore, rank: wr.rank, points: wr.points },
+            update: { totalScore: wr.totalScore, rank: wr.rank, points: wr.points },
+          });
+        }
+        leaguesFinalized++;
+      }
+    }
 
     return NextResponse.json({
       message: `Synced ${toUpsert.length} golfers from ESPN (${notFound} not matched)`,
@@ -244,7 +300,8 @@ export async function POST(request: NextRequest) {
       espnEvent: espnEvent.name,
       updated: toUpsert.length,
       notFound,
-      markedComplete: shouldMarkComplete && !tournament.isComplete,
+      markedComplete: isFirstComplete,
+      leaguesFinalized,
     });
   } catch (error) {
     console.error('ESPN sync error:', error);
