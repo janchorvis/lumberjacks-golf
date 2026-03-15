@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const forceFinalize = url.searchParams.get('force') === 'true';
+    const forceFinalize = searchParams.get('force') === 'true';
 
     // Find active tournament — if force=true, also check recently completed ones
     const tournament = await prisma.tournament.findFirst({
