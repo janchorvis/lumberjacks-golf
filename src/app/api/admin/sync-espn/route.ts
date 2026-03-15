@@ -219,16 +219,24 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Batch upsert in a single transaction
-    await prisma.$transaction(
-      toUpsert.map((d) =>
+    // Auto-detect completion: ESPN says "final/post" OR all active golfers have R4 done
+    const espnStatusDesc = espnEvent.status?.type?.description?.toLowerCase() ?? '';
+    const allR4Done = toUpsert.filter(d => d.status === 'active').every(d => d.r4Score != null);
+    const shouldMarkComplete = espnStatusDesc.includes('final') || espnStatusDesc.includes('post') || allR4Done;
+
+    // Batch upsert + optional complete flag in a single transaction
+    await prisma.$transaction([
+      ...toUpsert.map((d) =>
         prisma.tournamentResult.upsert({
           where: { tournamentId_golferId: { tournamentId: tournament.id, golferId: d.golferId } },
           create: { tournamentId: tournament.id, ...d },
           update: d,
         })
-      )
-    );
+      ),
+      ...(shouldMarkComplete && !tournament.isComplete
+        ? [prisma.tournament.update({ where: { id: tournament.id }, data: { isComplete: true } })]
+        : []),
+    ]);
 
     return NextResponse.json({
       message: `Synced ${toUpsert.length} golfers from ESPN (${notFound} not matched)`,
@@ -236,6 +244,7 @@ export async function POST(request: NextRequest) {
       espnEvent: espnEvent.name,
       updated: toUpsert.length,
       notFound,
+      markedComplete: shouldMarkComplete && !tournament.isComplete,
     });
   } catch (error) {
     console.error('ESPN sync error:', error);
