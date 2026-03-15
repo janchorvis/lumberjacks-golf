@@ -27,6 +27,7 @@ interface BreakdownGolfer {
   golferName: string;
   scoreToPar: number | null;
   isBestFour: boolean;
+  isWinner?: boolean;
 }
 
 interface BreakdownTeam {
@@ -323,7 +324,7 @@ export default function StandingsPage() {
                               g.isBestFour ? 'text-gray-900' : 'text-gray-400 line-through'
                             }`}
                           >
-                            <span className="truncate text-xs">{g.golferName}</span>
+                            <span className="truncate text-xs">{g.isWinner ? '🏆 ' : ''}{g.golferName}</span>
                             <span className={`font-medium ml-2 text-xs ${g.isBestFour ? 'text-augusta-green' : ''}`}>
                               {formatScore(g.scoreToPar)}
                             </span>

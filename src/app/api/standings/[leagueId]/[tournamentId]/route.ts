@@ -50,6 +50,9 @@ export async function GET(
       results.map((r) => [r.golferId, r])
     );
 
+    const winnerResult = results.find((r) => r.position === 1 && r.status === 'active');
+    const winnerGolferId = winnerResult?.golferId ?? null;
+
     // Get weekly results for ranking info
     const weeklyResults = await prisma.weeklyResult.findMany({
       where: { leagueId, tournamentId },
@@ -105,6 +108,7 @@ export async function GET(
         picks: golferScores.map((g) => ({
           ...g,
           isBestFour: bestFourIds.has(g.golferId),
+          isWinner: winnerGolferId !== null && g.golferId === winnerGolferId,
         })),
       };
     });
