@@ -383,7 +383,7 @@ export default function DraftPage() {
                   <span className="text-[10px] font-semibold text-gray-400 w-4 shrink-0">R{round}</span>
                   <div className="flex gap-1 flex-wrap">
                     {picks.map((pick) => {
-                      const globalPickNum = (round - 1) * 4 + pick.position; // 1-indexed
+                      const globalPickNum = (round - 1) * 4 + pick.position + 1; // 1-indexed (position is 0-based)
                       const isDone = globalPickNum <= draft.totalPicks;
                       const isCurrent = globalPickNum === draft.totalPicks + 1 && draft.status === 'active';
                       const isMe = pick.userId === user?.id;
