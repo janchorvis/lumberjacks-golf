@@ -397,16 +397,19 @@ export default function DraftPage() {
                   disabled={picking}
                   className="w-full flex items-center justify-between px-4 py-3 min-h-[48px] rounded-xl border border-gray-200 hover:border-augusta-green hover:bg-augusta-green/5 active:bg-augusta-green/10 transition-colors disabled:opacity-50 text-left"
                 >
-                  <div className="flex items-center gap-3">
-                    {golfer.odds != null ? (
-                      <span className="text-xs font-mono text-amber-600 w-14 text-right shrink-0">
-                        +{golfer.odds}
+                  <div className="flex items-center gap-2 min-w-0">
+                    {golfer.ranking != null ? (
+                      <span className="text-xs font-mono text-gray-400 w-7 text-right shrink-0">
+                        #{golfer.ranking}
                       </span>
                     ) : (
-                      <span className="w-14 shrink-0" />
+                      <span className="w-7 shrink-0" />
                     )}
-                    <span className="text-sm font-medium text-gray-900">
+                    <span className="text-sm font-medium text-gray-900 truncate">
                       {golfer.name}
+                      {golfer.odds != null && (
+                        <span className="text-xs text-amber-600 font-normal ml-1">(+{golfer.odds})</span>
+                      )}
                     </span>
                   </div>
                   <span className="text-xs text-augusta-green font-semibold shrink-0 ml-2">
@@ -473,36 +476,56 @@ export default function DraftPage() {
             </div>
           </div>
 
-          {queueEnabled && !queueOpen && queueGolferIds.length === 0 && (
-            <p className="px-4 py-3 text-xs text-gray-400">
-              Auto-draft is on, but your queue is empty. Tap <span className="font-semibold text-gray-500">Edit</span> to add golfers.
-            </p>
-          )}
+          {!queueOpen && (() => {
+            const topAvailable = queueGolferIds.find(gid =>
+              draft.availableGolfers.some(a => a.golferId === gid)
+            );
+            const topGolfer = topAvailable
+              ? draft.availableGolfers.find(a => a.golferId === topAvailable)
+              : null;
 
-          {queueEnabled && !queueOpen && queueGolferIds.length > 0 && (
-            <div className="px-4 py-2 space-y-1">
-              {queueGolferIds.slice(0, 5).map((gid, i) => {
-                const g = draft.availableGolfers.find(a => a.golferId === gid);
-                const label = g ? g.name : '(already drafted)';
-                const unavailable = !g;
-                return (
-                  <div key={gid} className={`flex items-center gap-2 text-xs ${unavailable ? 'text-gray-300 line-through' : 'text-gray-700'}`}>
-                    <span className="w-4 text-gray-400 text-right">{i + 1}.</span>
-                    <span>{label}</span>
+            if (queueGolferIds.length === 0) {
+              return (
+                <p className="px-4 py-3 text-xs text-gray-400">
+                  {queueEnabled
+                    ? <>Auto-draft is on, but your queue is empty. Tap <span className="font-semibold text-gray-500">Edit</span> to add golfers.</>
+                    : <>No queue yet. Tap <span className="font-semibold text-gray-500">Edit</span> to build one.</>
+                  }
+                </p>
+              );
+            }
+
+            return (
+              <div className="px-4 py-2 space-y-1">
+                {isMyTurn && topGolfer && (
+                  <div className="flex items-center gap-2 mb-2 px-2 py-1.5 bg-augusta-gold/10 rounded-lg border border-augusta-gold/30">
+                    <span className="text-[10px] font-bold text-augusta-green uppercase tracking-wide">Next up:</span>
+                    <span className="text-sm font-semibold text-gray-900">{topGolfer.name}</span>
+                    {topGolfer.odds && <span className="text-xs text-amber-600">(+{topGolfer.odds})</span>}
+                    {!queueEnabled && <span className="ml-auto text-[10px] text-gray-400">tap to draft manually</span>}
                   </div>
-                );
-              })}
-              {queueGolferIds.length > 5 && (
-                <p className="text-xs text-gray-400 pl-6">+{queueGolferIds.length - 5} more</p>
-              )}
-            </div>
-          )}
-
-          {!queueEnabled && !queueOpen && (
-            <p className="px-4 py-3 text-xs text-gray-400">
-              Off — you&apos;ll pick manually when it&apos;s your turn.
-            </p>
-          )}
+                )}
+                {queueGolferIds.slice(0, 5).map((gid, i) => {
+                  const g = draft.availableGolfers.find(a => a.golferId === gid);
+                  const label = g ? g.name : '(already drafted)';
+                  const unavailable = !g;
+                  return (
+                    <div key={gid} className={`flex items-center gap-2 text-xs ${unavailable ? 'text-gray-300 line-through' : 'text-gray-700'}`}>
+                      <span className="w-4 text-gray-400 text-right">{i + 1}.</span>
+                      <span>{label}</span>
+                      {g?.odds && <span className="text-amber-600">(+{g.odds})</span>}
+                    </div>
+                  );
+                })}
+                {queueGolferIds.length > 5 && (
+                  <p className="text-xs text-gray-400 pl-6">+{queueGolferIds.length - 5} more</p>
+                )}
+                {!queueEnabled && (
+                  <p className="text-[10px] text-gray-400 pt-1">Auto-draft off — you&apos;ll confirm picks manually.</p>
+                )}
+              </div>
+            );
+          })()}
 
           {queueOpen && (
             <div className="px-4 py-3 space-y-3">
@@ -566,9 +589,12 @@ export default function DraftPage() {
                         onClick={() => setQueueGolferIds([...queueGolferIds, g.golferId])}
                         className="w-full text-left px-2 py-1.5 text-sm hover:bg-augusta-green/5 rounded flex items-center gap-2"
                       >
-                        {g.ranking && <span className="text-xs text-gray-400 w-5 text-right">{g.ranking}</span>}
-                        <span className="text-gray-800">{g.name}</span>
-                        <span className="ml-auto text-augusta-green text-xs">+</span>
+                        {g.ranking && <span className="text-xs text-gray-400 w-5 text-right shrink-0">#{g.ranking}</span>}
+                        <span className="text-gray-800 truncate">
+                          {g.name}
+                          {g.odds && <span className="text-xs text-amber-600 ml-1">(+{g.odds})</span>}
+                        </span>
+                        <span className="ml-auto text-augusta-green text-xs shrink-0">+</span>
                       </button>
                     ))}
                 </div>
@@ -584,15 +610,14 @@ export default function DraftPage() {
                   await fetch(`/api/draft/${draft.tournamentId}/queue`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ golferIds: queueGolferIds, enabled: true }),
+                    body: JSON.stringify({ golferIds: queueGolferIds, enabled: queueEnabled }),
                   });
-                  setQueueEnabled(true);
                   setSavingQueue(false);
                   setQueueOpen(false);
                 }}
                 className="w-full"
               >
-                Save Queue & Enable Auto-Draft
+                Save Queue
               </Button>
             </div>
           )}
