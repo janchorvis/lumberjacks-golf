@@ -21,6 +21,7 @@ interface AvailableGolfer {
   golferId: string;
   name: string;
   ranking: number | null;
+  odds: number | null;
 }
 
 interface DraftState {
@@ -283,11 +284,11 @@ export default function DraftPage() {
   const currentDrafterName =
     draft.players.find((p) => p.userId === draft.currentDrafter)?.username || '';
 
-  // Sort golfers: ranked first by ranking asc, then unranked alphabetically
+  // Sort golfers: by betting odds first (lower = more favored), then unodded alphabetically
   const sortedGolfers = [...draft.availableGolfers].sort((a, b) => {
-    if (a.ranking !== null && b.ranking !== null) return a.ranking - b.ranking;
-    if (a.ranking !== null) return -1;
-    if (b.ranking !== null) return 1;
+    if (a.odds !== null && b.odds !== null) return a.odds - b.odds;
+    if (a.odds !== null) return -1;
+    if (b.odds !== null) return 1;
     return a.name.localeCompare(b.name);
   });
 
@@ -397,12 +398,12 @@ export default function DraftPage() {
                   className="w-full flex items-center justify-between px-4 py-3 min-h-[48px] rounded-xl border border-gray-200 hover:border-augusta-green hover:bg-augusta-green/5 active:bg-augusta-green/10 transition-colors disabled:opacity-50 text-left"
                 >
                   <div className="flex items-center gap-3">
-                    {golfer.ranking != null ? (
-                      <span className="text-xs font-mono text-gray-400 w-7 text-right shrink-0">
-                        #{golfer.ranking}
+                    {golfer.odds != null ? (
+                      <span className="text-xs font-mono text-amber-600 w-14 text-right shrink-0">
+                        +{golfer.odds}
                       </span>
                     ) : (
-                      <span className="w-7 shrink-0" />
+                      <span className="w-14 shrink-0" />
                     )}
                     <span className="text-sm font-medium text-gray-900">
                       {golfer.name}

@@ -148,8 +148,9 @@ export async function GET(
         golferId: f.golferId,
         name: f.golfer.name,
         ranking: f.golfer.ranking,
+        odds: f.odds ?? null,
       }))
-      .sort((a, b) => (a.ranking ?? 999) - (b.ranking ?? 999));
+      .sort((a, b) => (a.odds ?? 999999) - (b.odds ?? 999999));
 
     // Current drafter
     const currentDrafter =

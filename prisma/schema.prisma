@@ -76,6 +76,7 @@ model TournamentField {
   id           String     @id @default(cuid())
   tournamentId String
   golferId     String
+  odds         Int?       // betting odds (American format, e.g. 1100 = +1100)
   tournament   Tournament @relation(fields: [tournamentId], references: [id])
   golfer       Golfer     @relation(fields: [golferId], references: [id])
 
