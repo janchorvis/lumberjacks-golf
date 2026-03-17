@@ -364,6 +364,64 @@ export default function DraftPage() {
         </div>
       )}
 
+      {/* Snake Order Grid */}
+      {draft.fullSnakeOrder && draft.fullSnakeOrder.length > 0 && (
+        <Card className="overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <span className="text-sm font-semibold text-gray-800">Draft Order</span>
+            <span className="text-xs text-gray-400 ml-2">
+              {draft.totalPicks} of 28 picks made
+            </span>
+          </div>
+          <div className="px-3 py-3 space-y-1.5">
+            {Array.from({ length: 7 }, (_, roundIdx) => {
+              const round = roundIdx + 1;
+              const picks = draft.fullSnakeOrder.filter(p => p.round === round)
+                .sort((a, b) => a.position - b.position);
+              return (
+                <div key={round} className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-semibold text-gray-400 w-4 shrink-0">R{round}</span>
+                  <div className="flex gap-1 flex-wrap">
+                    {picks.map((pick) => {
+                      const globalPickNum = (round - 1) * 4 + pick.position; // 1-indexed
+                      const isDone = globalPickNum <= draft.totalPicks;
+                      const isCurrent = globalPickNum === draft.totalPicks + 1 && draft.status === 'active';
+                      const isMe = pick.userId === user?.id;
+                      const playerName = draft.players.find(p => p.userId === pick.userId)?.username ?? '?';
+                      const shortName = playerName.length > 6 ? playerName.slice(0, 6) : playerName;
+                      return (
+                        <div
+                          key={`${round}-${pick.position}`}
+                          title={playerName}
+                          className={`
+                            text-[10px] font-semibold px-1.5 py-0.5 rounded transition-all
+                            ${isCurrent
+                              ? 'bg-augusta-gold text-augusta-green ring-1 ring-augusta-gold scale-110'
+                              : isDone
+                              ? 'bg-gray-100 text-gray-400 line-through'
+                              : isMe
+                              ? 'bg-augusta-green/10 text-augusta-green border border-augusta-green/30'
+                              : 'bg-gray-50 text-gray-500 border border-gray-200'
+                            }
+                          `}
+                        >
+                          {shortName}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="px-4 pb-3 flex items-center gap-3 text-[10px] text-gray-400">
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-augusta-gold inline-block" /> Current</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-augusta-green/10 border border-augusta-green/30 inline-block" /> You</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-gray-100 inline-block" /> Done</span>
+          </div>
+        </Card>
+      )}
+
       {/* Pick error */}
       {pickError && (
         <div className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
