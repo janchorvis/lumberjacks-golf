@@ -298,6 +298,52 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Seed tournament field from ESPN competitors when ?seedField=true
+    let fieldSeeded = 0;
+    if (searchParams.get('seedField') === 'true') {
+      const existingField = new Set(fieldEntries.map(e => e.golferId));
+      for (const comp of competitors) {
+        const name = comp.athlete?.displayName;
+        if (!name) continue;
+        const espnId = comp.id ?? null;
+
+        // Try to find golfer by ESPN externalId first, then fuzzy name match
+        let golfer = espnId
+          ? await prisma.golfer.findFirst({ where: { externalId: espnId } })
+          : null;
+
+        if (!golfer) {
+          // Fuzzy match against ALL golfers in DB (not just field)
+          const allGolfers = await prisma.golfer.findMany({ select: { id: true, name: true } });
+          let bestMatch: { id: string; name: string } | null = null;
+          let bestScore = 0;
+          for (const g of allGolfers) {
+            const score = fuzzyMatch(name, g.name);
+            if (score > bestScore) { bestScore = score; bestMatch = g; }
+          }
+          if (bestMatch && bestScore >= 0.5) {
+            golfer = { id: bestMatch.id, name: bestMatch.name } as { id: string; name: string; externalId: string | null; ranking: number | null; imageUrl: string | null };
+          }
+        }
+
+        if (!golfer) {
+          // Create new golfer entry from ESPN data
+          golfer = await prisma.golfer.create({
+            data: { name, externalId: espnId },
+          });
+        }
+
+        // Add to tournament field if not already there
+        if (!existingField.has(golfer.id)) {
+          await prisma.tournamentField.create({
+            data: { tournamentId: tournament.id, golferId: golfer.id },
+          });
+          existingField.add(golfer.id);
+          fieldSeeded++;
+        }
+      }
+    }
+
     return NextResponse.json({
       message: `Synced ${toUpsert.length} golfers from ESPN (${notFound} not matched)`,
       tournament: tournament.name,
@@ -306,6 +352,7 @@ export async function POST(request: NextRequest) {
       notFound,
       markedComplete: isFirstComplete,
       leaguesFinalized,
+      ...(fieldSeeded > 0 ? { fieldSeeded } : {}),
     });
   } catch (error) {
     console.error('ESPN sync error:', error);

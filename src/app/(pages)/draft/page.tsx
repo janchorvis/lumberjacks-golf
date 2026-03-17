@@ -75,6 +75,7 @@ export default function DraftPage() {
   const [queueEnabled, setQueueEnabled] = useState(false);
   const [queueGolferIds, setQueueGolferIds] = useState<string[]>([]);
   const [savingQueue, setSavingQueue] = useState(false);
+  const [queueSearch, setQueueSearch] = useState('');
 
   const fetchDraft = useCallback(async () => {
     try {
@@ -471,6 +472,12 @@ export default function DraftPage() {
             </div>
           </div>
 
+          {queueEnabled && !queueOpen && queueGolferIds.length === 0 && (
+            <p className="px-4 py-3 text-xs text-gray-400">
+              Auto-draft is on, but your queue is empty. Tap <span className="font-semibold text-gray-500">Edit</span> to add golfers.
+            </p>
+          )}
+
           {queueEnabled && !queueOpen && queueGolferIds.length > 0 && (
             <div className="px-4 py-2 space-y-1">
               {queueGolferIds.slice(0, 5).map((gid, i) => {
@@ -543,12 +550,13 @@ export default function DraftPage() {
                 <input
                   type="text"
                   placeholder="Search golfers..."
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
+                  value={queueSearch}
+                  onChange={e => setQueueSearch(e.target.value)}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-augusta-green"
                 />
                 <div className="mt-1 max-h-40 overflow-y-auto space-y-0.5">
-                  {filteredGolfers
+                  {sortedGolfers
+                    .filter(g => g.name.toLowerCase().includes(queueSearch.toLowerCase()))
                     .filter(g => !queueGolferIds.includes(g.golferId))
                     .slice(0, 20)
                     .map(g => (
