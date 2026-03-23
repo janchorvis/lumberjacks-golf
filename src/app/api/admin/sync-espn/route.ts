@@ -231,6 +231,34 @@ export async function POST(request: NextRequest) {
 
     const isFirstComplete = (shouldMarkComplete && !tournament.isComplete) || (forceFinalize && shouldMarkComplete);
 
+    // Flag field golfers missing from ESPN response (pre-tournament WD or data gap)
+    // If tournament has started (any r1Score exists) and a golfer in our field
+    // never appears in ESPN results with any round scores, mark them WD.
+    const hasStarted = toUpsert.some(d => d.r1Score != null);
+    if (hasStarted) {
+      const syncedGolferIds = new Set(toUpsert.map(d => d.golferId));
+      const existingActiveResults = existingResults.filter(
+        r => r.status === 'active' || r.status === 'wd'
+      );
+      for (const existing of existingActiveResults) {
+        if (!syncedGolferIds.has(existing.golferId) && !lockedStatuses.has(existing.golferId)) {
+          // Golfer was in field, has a result row, but ESPN didn't include them - WD
+          toUpsert.push({
+            golferId: existing.golferId,
+            r1Score: null,
+            r2Score: null,
+            r3Score: null,
+            r4Score: null,
+            scoreToPar: 0,
+            status: 'wd',
+            position: null,
+            thru: null,
+          });
+          lockedStatuses.add(existing.golferId); // prevent future overwrites
+        }
+      }
+    }
+
     // Batch upsert + optional complete flag in a single transaction
     await prisma.$transaction([
       ...toUpsert.map((d) =>
