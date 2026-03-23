@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
@@ -284,11 +284,23 @@ export default function DraftPage() {
   const currentDrafterName =
     draft.players.find((p) => p.userId === draft.currentDrafter)?.username || '';
 
-  // Sort golfers: by betting odds first (lower = more favored), then unodded alphabetically
+  // Sort golfers: by betting odds first (lower = more favored), then by world ranking, then alphabetically
   const sortedGolfers = [...draft.availableGolfers].sort((a, b) => {
-    if (a.odds !== null && b.odds !== null) return a.odds - b.odds;
-    if (a.odds !== null) return -1;
-    if (b.odds !== null) return 1;
+    const aHasOdds = a.odds !== null;
+    const bHasOdds = b.odds !== null;
+    const aHasRanking = a.ranking !== null;
+    const bHasRanking = b.ranking !== null;
+    // Both have odds → sort by odds
+    if (aHasOdds && bHasOdds) return a.odds! - b.odds!;
+    // One has odds → odds player first
+    if (aHasOdds) return -1;
+    if (bHasOdds) return 1;
+    // Neither has odds: both have ranking → sort by ranking
+    if (aHasRanking && bHasRanking) return a.ranking! - b.ranking!;
+    // One has ranking → ranked player first
+    if (aHasRanking) return -1;
+    if (bHasRanking) return 1;
+    // Neither has odds or ranking → alphabetical
     return a.name.localeCompare(b.name);
   });
 
@@ -448,33 +460,69 @@ export default function DraftPage() {
             {filteredGolfers.length === 0 ? (
               <p className="text-sm text-gray-400 text-center py-6">No golfers found.</p>
             ) : (
-              filteredGolfers.map((golfer) => (
-                <button
-                  key={golfer.golferId}
-                  onClick={() => setConfirmGolfer(golfer)}
-                  disabled={picking}
-                  className="w-full flex items-center justify-between px-4 py-3 min-h-[48px] rounded-xl border border-gray-200 hover:border-augusta-green hover:bg-augusta-green/5 active:bg-augusta-green/10 transition-colors disabled:opacity-50 text-left"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    {golfer.ranking != null ? (
-                      <span className="text-xs font-mono text-gray-400 w-7 text-right shrink-0">
-                        #{golfer.ranking}
+              (() => {
+                const items: React.ReactNode[] = [];
+                let shownOddsHeader = false;
+                let shownRankingHeader = false;
+                let shownAlphaHeader = false;
+                filteredGolfers.forEach((golfer) => {
+                  const hasOdds = golfer.odds !== null;
+                  const hasRanking = golfer.ranking !== null;
+                  if (hasOdds && !shownOddsHeader) {
+                    shownOddsHeader = true;
+                    items.push(
+                      <div key="header-odds" className="flex items-center gap-2 pt-1 pb-0.5">
+                        <span className="text-xs font-semibold text-amber-600 uppercase tracking-wide">Betting Favorites</span>
+                        <div className="flex-1 h-px bg-amber-200" />
+                      </div>
+                    );
+                  } else if (!hasOdds && hasRanking && !shownRankingHeader) {
+                    shownRankingHeader = true;
+                    items.push(
+                      <div key="header-ranking" className="flex items-center gap-2 pt-2 pb-0.5">
+                        <span className="text-xs font-semibold text-blue-500 uppercase tracking-wide">By World Ranking</span>
+                        <div className="flex-1 h-px bg-blue-200" />
+                      </div>
+                    );
+                  } else if (!hasOdds && !hasRanking && !shownAlphaHeader) {
+                    shownAlphaHeader = true;
+                    items.push(
+                      <div key="header-alpha" className="flex items-center gap-2 pt-2 pb-0.5">
+                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Alphabetical</span>
+                        <div className="flex-1 h-px bg-gray-200" />
+                      </div>
+                    );
+                  }
+                  items.push(
+                    <button
+                      key={golfer.golferId}
+                      onClick={() => setConfirmGolfer(golfer)}
+                      disabled={picking}
+                      className="w-full flex items-center justify-between px-4 py-3 min-h-[48px] rounded-xl border border-gray-200 hover:border-augusta-green hover:bg-augusta-green/5 active:bg-augusta-green/10 transition-colors disabled:opacity-50 text-left"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        {golfer.ranking != null ? (
+                          <span className="text-xs font-mono text-gray-400 w-7 text-right shrink-0">
+                            #{golfer.ranking}
+                          </span>
+                        ) : (
+                          <span className="w-7 shrink-0" />
+                        )}
+                        <span className="text-sm font-medium text-gray-900 truncate">
+                          {golfer.name}
+                          {golfer.odds != null && (
+                            <span className="text-xs text-amber-600 font-normal ml-1">(+{golfer.odds})</span>
+                          )}
+                        </span>
+                      </div>
+                      <span className="text-xs text-augusta-green font-semibold shrink-0 ml-2">
+                        Draft
                       </span>
-                    ) : (
-                      <span className="w-7 shrink-0" />
-                    )}
-                    <span className="text-sm font-medium text-gray-900 truncate">
-                      {golfer.name}
-                      {golfer.odds != null && (
-                        <span className="text-xs text-amber-600 font-normal ml-1">(+{golfer.odds})</span>
-                      )}
-                    </span>
-                  </div>
-                  <span className="text-xs text-augusta-green font-semibold shrink-0 ml-2">
-                    Draft
-                  </span>
-                </button>
-              ))
+                    </button>
+                  );
+                });
+                return items;
+              })()
             )}
           </div>
         </div>
