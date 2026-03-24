@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
       where: forceFinalize
         ? { externalId: { not: null } }
         : { isComplete: false, externalId: { not: null } },
-      orderBy: { startDate: 'desc' },
+      orderBy: { startDate: 'asc' },
     });
 
     if (!tournament) {
