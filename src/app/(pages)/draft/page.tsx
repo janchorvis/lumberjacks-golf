@@ -685,23 +685,57 @@ export default function DraftPage() {
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-augusta-green"
                 />
                 <div className="mt-1 max-h-60 overflow-y-auto space-y-0.5">
-                  {sortedGolfers
-                    .filter(g => g.name.toLowerCase().includes(queueSearch.toLowerCase()))
-                    .filter(g => !queueGolferIds.includes(g.golferId))
-                    .map(g => (
-                      <button
-                        key={g.golferId}
-                        onClick={() => setQueueGolferIds([...queueGolferIds, g.golferId])}
-                        className="w-full text-left px-2 py-1.5 text-sm hover:bg-augusta-green/5 rounded flex items-center gap-2"
-                      >
-                        {g.ranking && <span className="text-xs text-gray-400 w-5 text-right shrink-0">#{g.ranking}</span>}
-                        <span className="text-gray-800 truncate">
-                          {g.name}
-                          {g.odds && <span className="text-xs text-amber-600 ml-1">(+{g.odds})</span>}
-                        </span>
-                        <span className="ml-auto text-augusta-green text-xs shrink-0">+</span>
-                      </button>
-                    ))}
+                  {(() => {
+                    const filtered = sortedGolfers
+                      .filter(g => g.name.toLowerCase().includes(queueSearch.toLowerCase()))
+                      .filter(g => !queueGolferIds.includes(g.golferId));
+                    let shownOdds = false, shownRanking = false, shownAlpha = false;
+                    return filtered.map(g => {
+                      const items: React.ReactNode[] = [];
+                      if (g.odds !== null && !shownOdds) {
+                        shownOdds = true;
+                        items.push(
+                          <div key="q-header-odds" className="flex items-center gap-2 pt-1 pb-0.5">
+                            <span className="text-xs font-semibold text-amber-600 uppercase tracking-wide">Betting Favorites</span>
+                            <span className="flex-1 border-t border-amber-200" />
+                          </div>
+                        );
+                      }
+                      if (g.odds === null && g.ranking !== null && !shownRanking) {
+                        shownRanking = true;
+                        items.push(
+                          <div key="q-header-ranking" className="flex items-center gap-2 pt-2 pb-0.5">
+                            <span className="text-xs font-semibold text-blue-500 uppercase tracking-wide">By World Ranking</span>
+                            <span className="flex-1 border-t border-blue-200" />
+                          </div>
+                        );
+                      }
+                      if (g.odds === null && g.ranking === null && !shownAlpha) {
+                        shownAlpha = true;
+                        items.push(
+                          <div key="q-header-alpha" className="flex items-center gap-2 pt-2 pb-0.5">
+                            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Alphabetical</span>
+                            <span className="flex-1 border-t border-gray-200" />
+                          </div>
+                        );
+                      }
+                      items.push(
+                        <button
+                          key={g.golferId}
+                          onClick={() => setQueueGolferIds([...queueGolferIds, g.golferId])}
+                          className="w-full text-left px-2 py-1.5 text-sm hover:bg-augusta-green/5 rounded flex items-center gap-2"
+                        >
+                          {g.ranking && <span className="text-xs text-gray-400 w-5 text-right shrink-0">#{g.ranking}</span>}
+                          <span className="text-gray-800 truncate">
+                            {g.name}
+                            {g.odds && <span className="text-xs text-amber-600 ml-1">(+{g.odds})</span>}
+                          </span>
+                          <span className="ml-auto text-augusta-green text-xs shrink-0">+</span>
+                        </button>
+                      );
+                      return items;
+                    });
+                  })()}
                 </div>
               </div>
 
