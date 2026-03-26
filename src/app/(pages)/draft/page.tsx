@@ -684,11 +684,10 @@ export default function DraftPage() {
                   onChange={e => setQueueSearch(e.target.value)}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-augusta-green"
                 />
-                <div className="mt-1 max-h-40 overflow-y-auto space-y-0.5">
+                <div className="mt-1 max-h-60 overflow-y-auto space-y-0.5">
                   {sortedGolfers
                     .filter(g => g.name.toLowerCase().includes(queueSearch.toLowerCase()))
                     .filter(g => !queueGolferIds.includes(g.golferId))
-                    .slice(0, 20)
                     .map(g => (
                       <button
                         key={g.golferId}
