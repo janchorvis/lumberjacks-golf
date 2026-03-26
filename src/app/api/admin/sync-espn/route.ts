@@ -66,6 +66,29 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // Auto-complete any drafts past their pick deadline before syncing scores
+    const now = new Date();
+    const activeDrafts = await prisma.draft.findMany({
+      where: {
+        status: 'active',
+        tournament: { pickDeadline: { lte: now } },
+      },
+      select: { id: true, tournament: { select: { name: true } } },
+    });
+    if (activeDrafts.length > 0) {
+      const baseUrl = request.nextUrl.origin;
+      const secret = cronSecret || 'lumberjacks-cron-2026';
+      try {
+        const acResp = await fetch(`${baseUrl}/api/admin/auto-complete-draft?secret=${secret}`, {
+          method: 'POST',
+        });
+        const acData = await acResp.json();
+        console.log('Auto-complete draft result:', JSON.stringify(acData));
+      } catch (acErr) {
+        console.error('Auto-complete draft call failed:', acErr);
+      }
+    }
+
     const forceFinalize = searchParams.get('force') === 'true';
 
     // Find active tournament — if force=true, also check recently completed ones
