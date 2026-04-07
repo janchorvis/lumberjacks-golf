@@ -38,6 +38,10 @@ export async function GET(request: NextRequest) {
         tournament: true,
         picks: {
           orderBy: { pickNumber: 'asc' },
+          include: {
+            user: true,
+            golfer: true,
+          },
         },
       },
     });
@@ -62,6 +66,7 @@ export async function GET(request: NextRequest) {
     );
 
     const currentDrafter = currentDrafterId ? membersById.get(currentDrafterId) ?? null : null;
+    const lastPick = draft.picks.length > 0 ? draft.picks[draft.picks.length - 1] : null;
 
     return NextResponse.json({
       active: true,
@@ -74,6 +79,22 @@ export async function GET(request: NextRequest) {
         totalPicks: draft.league.members.length * 7,
         draftOrder: draftOrder.map((userId) => membersById.get(userId) ?? { userId, username: userId, email: null }),
         currentDrafter,
+        lastPick: lastPick
+          ? {
+              id: lastPick.id,
+              pickNumber: lastPick.pickNumber,
+              round: lastPick.round,
+              drafter: {
+                userId: lastPick.userId,
+                username: lastPick.user.username,
+                email: lastPick.user.email,
+              },
+              golfer: {
+                id: lastPick.golferId,
+                name: lastPick.golfer.name,
+              },
+            }
+          : null,
         tournament: {
           id: draft.tournament.id,
           name: draft.tournament.name,
