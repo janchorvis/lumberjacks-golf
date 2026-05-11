@@ -7,6 +7,13 @@ export const dynamic = 'force-dynamic';
 
 const ESPN_SCOREBOARD = 'https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard';
 
+const MAJOR_TOURNAMENT_NAMES = new Set([
+  'Masters Tournament',
+  'PGA Championship',
+  'U.S. Open',
+  'The Open Championship',
+]);
+
 function parseScoreToPar(display: string): number {
   if (!display || display === 'E') return 0;
   const n = parseInt(display.replace('+', ''), 10);
@@ -336,7 +343,12 @@ export async function POST(request: NextRequest) {
           }),
         }));
 
-        const weeklyResults = calculateWeeklyResults(teams, winnerGolferId);
+        const isMajor = MAJOR_TOURNAMENT_NAMES.has(tournament.name);
+        const weeklyResults = calculateWeeklyResults(teams, isMajor ? null : winnerGolferId)
+          .map((wr) => ({
+            ...wr,
+            points: isMajor ? wr.points * 2 : wr.points,
+          }));
 
         for (const wr of weeklyResults) {
           await prisma.weeklyResult.upsert({
