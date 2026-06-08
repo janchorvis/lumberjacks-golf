@@ -57,6 +57,12 @@ interface Team {
 const _tournamentCache = new Map<string, { tournament: TournamentData; teams: Team[] }>();
 
 const POINTS_MAP: Record<number, number> = { 1: 200, 2: 100, 3: 50 };
+const MAJOR_TOURNAMENT_NAMES = new Set([
+  'Masters Tournament',
+  'PGA Championship',
+  'U.S. Open',
+  'The Open Championship',
+]);
 
 function formatScore(score: number | null): string {
   if (score == null) return '--';
@@ -73,8 +79,9 @@ function formatPosition(pos: number | null, tiedMap: Map<number, boolean>): stri
   return tiedMap.get(pos) ? `T${pos}` : `${pos}`;
 }
 
-function buildTeams(members: MemberPick[], results: GolferResult[], isComplete: boolean): Team[] {
+function buildTeams(members: MemberPick[], results: GolferResult[], isComplete: boolean, tournamentName: string): Team[] {
   const resultMap = new Map(results.map((r) => [r.golferId, r]));
+  const isMajor = MAJOR_TOURNAMENT_NAMES.has(tournamentName);
 
   // Build tie map from full field results
   const posCounts = new Map<number, number>();
@@ -151,7 +158,7 @@ function buildTeams(members: MemberPick[], results: GolferResult[], isComplete: 
     let totalPts = 0;
     for (let k = i; k < j; k++) totalPts += POINTS_MAP[k + 1] ?? 0;
     const split = Math.round(totalPts / (j - i));
-    for (let k = i; k < j; k++) teams[k].points = split;
+    for (let k = i; k < j; k++) teams[k].points = isMajor ? split * 2 : split;
     i = j;
   }
 
@@ -217,7 +224,7 @@ export default function TournamentPage() {
         const res = await fetch(`/api/picks/${tournamentId}/league/${leagueId}`);
         if (!res.ok) throw new Error('Failed to fetch picks');
         const data = await res.json();
-        const builtTeams = buildTeams(data.members || [], t.results || [], t.isComplete);
+        const builtTeams = buildTeams(data.members || [], t.results || [], t.isComplete, t.name);
         setTeams(builtTeams);
         // Save to module cache
         _tournamentCache.set(tournamentId, { tournament: t, teams: builtTeams });
