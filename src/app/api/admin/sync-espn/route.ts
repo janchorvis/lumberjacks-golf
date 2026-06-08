@@ -344,11 +344,19 @@ export async function POST(request: NextRequest) {
         }));
 
         const isMajor = MAJOR_TOURNAMENT_NAMES.has(tournament.name);
-        const weeklyResults = calculateWeeklyResults(teams, isMajor ? null : winnerGolferId)
-          .map((wr) => ({
-            ...wr,
-            points: isMajor ? wr.points * 2 : wr.points,
-          }));
+        const weeklyResults = calculateWeeklyResults(teams, winnerGolferId)
+          .map((wr) => {
+            const hasWinner = winnerGolferId
+              ? [...wr.bestFour, ...wr.dropped].some((g) => g.golferId === winnerGolferId)
+              : false;
+            const winnerBonus = hasWinner ? 100 : 0;
+            const finishPoints = wr.points - winnerBonus;
+
+            return {
+              ...wr,
+              points: isMajor ? finishPoints * 2 + winnerBonus : wr.points,
+            };
+          });
 
         for (const wr of weeklyResults) {
           await prisma.weeklyResult.upsert({
