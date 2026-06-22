@@ -29,6 +29,20 @@ function parseStatus(espnStatus: string | undefined): string {
   return 'active';
 }
 
+function inferCutStatus(status: string, rounds: Record<number, number | null>, isTournamentFinal: boolean): string {
+  if (status !== 'active') return status;
+
+  // ESPN's golf scoreboard often omits an explicit CUT/MC status after a major
+  // finalizes, but cut players have only R1/R2 scores while made-cut players have
+  // R3/R4 scores. Mark them cut so scoring doesn't treat a two-round +5 as a
+  // better final score than a made-cut +8.
+  if (isTournamentFinal && rounds[1] != null && rounds[2] != null && rounds[3] == null && rounds[4] == null) {
+    return 'cut';
+  }
+
+  return status;
+}
+
 function normalize(s: string): string {
   return s
     .toLowerCase()
@@ -236,10 +250,13 @@ export async function POST(request: NextRequest) {
       }
 
       // Preserve manually-set WD/DQ — never let ESPN overwrite back to active.
-      // CUTs are detected from ESPN's explicit status strings.
+      // CUTs are inferred after the event is final because ESPN may leave missed-cut
+      // players as status=null with only R1/R2 scores.
       // WDs that ESPN doesn't report are set manually once and stay locked.
       const espnStatus = parseStatus(comp.status);
-      const finalStatus = lockedStatuses.has(bestMatch.golferId) ? 'wd' : espnStatus;
+      const finalStatus = lockedStatuses.has(bestMatch.golferId)
+        ? 'wd'
+        : inferCutStatus(espnStatus, rounds, espnEvent.status?.type?.completed === true);
 
       toUpsert.push({
         golferId: bestMatch.golferId,

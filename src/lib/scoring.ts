@@ -28,12 +28,28 @@ const POINTS_MAP: Record<number, number> = {
   4: 0,
 };
 
+export function getEffectiveScoreToPar(golfer: GolferScore): number | null {
+  if (golfer.scoreToPar === null) return null;
+
+  // Lumberjacks missed-cut rule:
+  // a player who misses the cut should not keep their two-round score as if it
+  // were a final 72-hole result. Treat all CUT/WD/DQ golfers as a blow-up score
+  // so they fall behind every player who completed the tournament.
+  if (golfer.status === 'cut' || golfer.status === 'wd' || golfer.status === 'dq') {
+    return 99;
+  }
+
+  return golfer.scoreToPar;
+}
+
 function sortGolfersByScore(golfers: GolferScore[]): GolferScore[] {
   return [...golfers].sort((a, b) => {
-    if (a.scoreToPar === null && b.scoreToPar === null) return 0;
-    if (a.scoreToPar === null) return 1;
-    if (b.scoreToPar === null) return -1;
-    return a.scoreToPar - b.scoreToPar;
+    const aScore = getEffectiveScoreToPar(a);
+    const bScore = getEffectiveScoreToPar(b);
+    if (aScore === null && bScore === null) return 0;
+    if (aScore === null) return 1;
+    if (bScore === null) return -1;
+    return aScore - bScore;
   });
 }
 
@@ -45,7 +61,7 @@ export function calculateBestFour(golfers: GolferScore[]): {
   const sorted = sortGolfersByScore(golfers);
   const bestFour = sorted.slice(0, 4);
   const dropped = sorted.slice(4);
-  const totalScore = bestFour.reduce((sum, g) => sum + (g.scoreToPar ?? 99), 0);
+  const totalScore = bestFour.reduce((sum, g) => sum + (getEffectiveScoreToPar(g) ?? 99), 0);
   return { bestFour, dropped, totalScore };
 }
 
