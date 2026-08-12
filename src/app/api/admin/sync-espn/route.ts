@@ -273,7 +273,11 @@ export async function POST(request: NextRequest) {
 
     // Auto-detect completion: ESPN says "final/post" OR all active golfers have R4 done
     const espnStatusDesc = espnEvent.status?.type?.description?.toLowerCase() ?? '';
-    const allR4Done = toUpsert.filter(d => d.status === 'active').every(d => d.r4Score != null);
+    // Array.every() is true for an empty list. ESPN often publishes the event
+    // shell before the field/leaderboard, so an empty pre-tournament response
+    // must never mark the tournament complete.
+    const activeResults = toUpsert.filter(d => d.status === 'active');
+    const allR4Done = activeResults.length > 0 && activeResults.every(d => d.r4Score != null);
     const shouldMarkComplete = espnStatusDesc.includes('final') || espnStatusDesc.includes('post') || allR4Done;
 
     const isFirstComplete = (shouldMarkComplete && !tournament.isComplete) || (forceFinalize && shouldMarkComplete);

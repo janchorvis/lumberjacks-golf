@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    const { id, name, course, location, startDate, endDate, pickDeadline, seasonId, field } =
+    const { id, name, course, location, startDate, endDate, pickDeadline, seasonId, field, isComplete } =
       await request.json();
 
     if (!name || !course || !location || !startDate || !endDate || !pickDeadline || !seasonId) {
@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
           endDate: new Date(endDate),
           pickDeadline: new Date(pickDeadline),
           seasonId,
+          ...(typeof isComplete === 'boolean' ? { isComplete } : {}),
         },
       });
 
